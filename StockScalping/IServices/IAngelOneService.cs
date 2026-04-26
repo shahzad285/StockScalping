@@ -3,11 +3,11 @@ namespace StockScalping.IServices;
 public interface IAngelOneService
 {
     /// <summary>
-    /// Checks connection to Angel One API
+    /// Logs in to Angel One API
     /// </summary>
     /// <param name="totp">Optional TOTP for first-time login</param>
-    /// <returns>True if connection is successful</returns>
-    Task<bool> CheckConnection(string totp = null);
+    /// <returns>True if login is successful</returns>
+    Task<bool> Login(string totp = null);
 
     /// <summary>
     /// Gets the current price of a stock
@@ -25,4 +25,10 @@ public interface IAngelOneService
     /// <param name="price">Order price</param>
     /// <returns>True if order placement is successful</returns>
     Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price);
+
+    /// <summary>
+    /// Gets all stocks held in the account
+    /// </summary>
+    /// <returns>List of stocks with symbol, quantity, average cost, and current value</returns>
+    Task<List<dynamic>> GetHoldingStocks();
 }

@@ -57,4 +57,28 @@ public class CacheService : ICacheService
             return _cache.ContainsKey(key);
         }
     }
+
+    /// <summary>
+    /// Gets all cached keys (for debugging)
+    /// </summary>
+    /// <returns>List of all cache keys</returns>
+    public List<string> GetAllKeys()
+    {
+        lock (_lockObject)
+        {
+            return _cache.Keys.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Clears all cache (for debugging/reset)
+    /// </summary>
+    public void ClearAll()
+    {
+        lock (_lockObject)
+        {
+            _cache.Clear();
+            System.Console.WriteLine("Cache cleared");
+        }
+    }
 }
