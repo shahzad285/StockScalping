@@ -1,20 +1,21 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StockScalping.Models;
+using StockScalping.IServices;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace StockScalping.Services;
 
-public class ScalpingService : BackgroundService
+public class ScalpingService : BackgroundService, IScalpingService
 {
     private readonly ILogger<ScalpingService> _logger;
-    private readonly AngelOneService _angelOneService;
+    private readonly IAngelOneService _angelOneService;
     private readonly List<StockProfile> _stocks;
 
     public ScalpingService(ILogger<ScalpingService> logger, 
-                          AngelOneService angelOneService,
+                          IAngelOneService angelOneService,
                           IConfiguration config)
     {
         _logger = logger;

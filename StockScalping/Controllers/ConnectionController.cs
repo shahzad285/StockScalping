@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using StockScalping.Services;
+using StockScalping.IServices;
 
 namespace StockScalping.Controllers;
 
@@ -7,17 +7,17 @@ namespace StockScalping.Controllers;
 [Route("[controller]")]
 public class ConnectionController : ControllerBase
 {
-    private readonly AngelOneService _angelOneService;
+    private readonly IAngelOneService _angelOneService;
 
-    public ConnectionController(AngelOneService angelOneService)
+    public ConnectionController(IAngelOneService angelOneService)
     {
         _angelOneService = angelOneService;
     }
 
     [HttpGet("check")]
-    public async Task<IActionResult> CheckConnection()
+    public async Task<IActionResult> CheckConnection([FromQuery] string totp = null)
     {
-        var isConnected = await _angelOneService.CheckConnection();
+        var isConnected = await _angelOneService.CheckConnection(totp);
         return Ok(new { connected = isConnected });
     }
 }

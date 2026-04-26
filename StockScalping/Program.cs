@@ -1,4 +1,5 @@
 using StockScalping.Services;
+using StockScalping.IServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,8 +11,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Add our services
-builder.Services.AddHttpClient();
-builder.Services.AddSingleton<AngelOneService>();
+builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddHttpClient<IAngelOneService, AngelOneService>();
+builder.Services.AddHostedService<ScalpingService>();
 
 var app = builder.Build();
 
