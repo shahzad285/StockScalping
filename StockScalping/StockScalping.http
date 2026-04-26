@@ -1,0 +1,6 @@
+@StockScalping_HostAddress = http://localhost:5048
+
+GET {{StockScalping_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

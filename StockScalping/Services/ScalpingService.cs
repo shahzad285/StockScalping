@@ -1,0 +1,51 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using StockScalping.Models;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace StockScalping.Services;
+
+public class ScalpingService : BackgroundService
+{
+    private readonly ILogger<ScalpingService> _logger;
+    private readonly AngelOneService _angelOneService;
+    private readonly List<StockProfile> _stocks;
+
+    public ScalpingService(ILogger<ScalpingService> logger, 
+                          AngelOneService angelOneService,
+                          IConfiguration config)
+    {
+        _logger = logger;
+        _angelOneService = angelOneService;
+        
+        // Load configured stocks from appsettings.json
+        _stocks = config.GetSection("Trading:Stocks").Get<List<StockProfile>>() 
+                 ?? new List<StockProfile>();
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            foreach (var stock in _stocks)
+            {
+                var currentPrice = await _angelOneService.GetCurrentPrice(stock.Symbol);
+                
+                if (currentPrice <= stock.PurchaseRate)
+                {
+                    _logger.LogInformation($"Buy condition met for {stock.Symbol} at {currentPrice}");
+                    await _angelOneService.PlaceOrder(stock.Symbol, 1, "BUY", currentPrice);
+                }
+                else if (currentPrice >= stock.SalesRate)
+                {
+                    _logger.LogInformation($"Sell condition met for {stock.Symbol} at {currentPrice}");
+                    await _angelOneService.PlaceOrder(stock.Symbol, 1, "SELL", currentPrice);
+                }
+            }
+            
+            await Task.Delay(5000, stoppingToken); // Check every 5 seconds
+        }
+    }
+}
