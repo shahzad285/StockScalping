@@ -13,6 +13,8 @@
 
 # Development-specific configuration
 appsettings.Development.json
+appsettings.*.json
+!appsettings.json
 
 # Build results
 [Dd]ebug/
