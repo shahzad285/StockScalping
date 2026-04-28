@@ -2,7 +2,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.IO;
+using System.Globalization;
 using StockScalping.IServices;
+using StockScalping.Models;
 
 namespace StockScalping.Services;
 
@@ -352,7 +354,100 @@ public class AngelOneService : IAngelOneService
         return false;
     }
 
-    public async Task<List<dynamic>> GetHoldingStocks()
+    private static string GetJsonString(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString() ?? "",
+            JsonValueKind.Number => element.GetRawText(),
+            _ => ""
+        };
+    }
+
+    private static int GetJsonInt(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Number)
+        {
+            if (element.TryGetInt32(out var intValue))
+            {
+                return intValue;
+            }
+
+            if (element.TryGetDecimal(out var decimalValue))
+            {
+                return (int)decimalValue;
+            }
+        }
+
+        if (element.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(element.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            return (int)parsedValue;
+        }
+
+        return 0;
+    }
+
+    private static decimal GetJsonDecimal(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var decimalValue))
+        {
+            return decimalValue;
+        }
+
+        if (element.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(element.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            return parsedValue;
+        }
+
+        return 0m;
+    }
+
+    private static decimal GetJsonDecimalProperty(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (element.TryGetProperty(propertyName, out var value))
+            {
+                return GetJsonDecimal(value);
+            }
+        }
+
+        return 0m;
+    }
+
+    private static string GetJsonStringProperty(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (element.TryGetProperty(propertyName, out var value))
+            {
+                return GetJsonString(value);
+            }
+        }
+
+        return "";
+    }
+
+    private static IEnumerable<JsonElement> GetHoldingItems(JsonElement dataElement)
+    {
+        if (dataElement.ValueKind == JsonValueKind.Array)
+        {
+            return dataElement.EnumerateArray();
+        }
+
+        if (dataElement.ValueKind == JsonValueKind.Object &&
+            dataElement.TryGetProperty("holdings", out var holdingsElement) &&
+            holdingsElement.ValueKind == JsonValueKind.Array)
+        {
+            return holdingsElement.EnumerateArray();
+        }
+
+        return Enumerable.Empty<JsonElement>();
+    }
+
+    public async Task<List<HoldingStock>> GetHoldingStocks()
     {
         try
         {
@@ -365,7 +460,7 @@ public class AngelOneService : IAngelOneService
                 }
                 else
                 {
-                    return new List<dynamic>();
+                    return new List<HoldingStock>();
                 }
             }
 
@@ -376,25 +471,29 @@ public class AngelOneService : IAngelOneService
             if (!response.IsSuccessStatusCode)
             {
                 System.Console.WriteLine($"Failed to fetch holdings: {response.StatusCode}");
-                return new List<dynamic>();
+                return new List<HoldingStock>();
             }
 
             var content = await response.Content.ReadAsStringAsync();
             var jsonDoc = JsonDocument.Parse(content);
             var root = jsonDoc.RootElement;
 
-            var holdings = new List<dynamic>();
+            var holdings = new List<HoldingStock>();
 
-            if (root.TryGetProperty("data", out var dataElement) && dataElement.ValueKind == JsonValueKind.Array)
+            if (root.TryGetProperty("data", out var dataElement))
             {
-                foreach (var item in dataElement.EnumerateArray())
+                foreach (var item in GetHoldingItems(dataElement))
                 {
-                    var holding = new
+                    var stockName = GetJsonStringProperty(item, "symbolname", "tradingsymbol", "symbol");
+                    var purchasePrice = GetJsonDecimalProperty(item, "avgprice", "averageprice", "averagePrice");
+                    var currentPrice = GetJsonDecimalProperty(item, "ltp", "currentprice", "currentPrice");
+
+                    var holding = new HoldingStock
                     {
-                        Symbol = item.TryGetProperty("symbolname", out var sym) ? sym.GetString() : "",
-                        Quantity = item.TryGetProperty("quantity", out var qty) ? int.Parse(qty.GetString() ?? "0") : 0,
-                        AverageCost = item.TryGetProperty("avgprice", out var avg) ? decimal.Parse(avg.GetString() ?? "0") : 0m,
-                        CurrentValue = item.TryGetProperty("ltp", out var ltp) ? decimal.Parse(ltp.GetString() ?? "0") : 0m
+                        StockName = stockName,
+                        PurchasePrice = purchasePrice,
+                        TotalStocks = item.TryGetProperty("quantity", out var qty) ? GetJsonInt(qty) : 0,
+                        CurrentPrice = currentPrice
                     };
                     holdings.Add(holding);
                 }
@@ -405,7 +504,7 @@ public class AngelOneService : IAngelOneService
         catch (Exception ex)
         {
             System.Console.WriteLine($"Error fetching holdings: {ex.Message}");
-            return new List<dynamic>();
+            return new List<HoldingStock>();
         }
     }
 }

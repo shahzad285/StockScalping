@@ -1,3 +1,5 @@
+using StockScalping.Models;
+
 namespace StockScalping.IServices;
 
 public interface IAngelOneService
@@ -29,6 +31,6 @@ public interface IAngelOneService
     /// <summary>
     /// Gets all stocks held in the account
     /// </summary>
-    /// <returns>List of stocks with symbol, quantity, average cost, and current value</returns>
-    Task<List<dynamic>> GetHoldingStocks();
+    /// <returns>List of stocks with purchase price, quantity, current price, and gain/loss</returns>
+    Task<List<HoldingStock>> GetHoldingStocks();
 }

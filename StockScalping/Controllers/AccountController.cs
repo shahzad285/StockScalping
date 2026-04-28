@@ -30,18 +30,7 @@ public class AccountController : ControllerBase
         try
         {
             var stocks = await _angelOneService.GetHoldingStocks();
-            var myStocksList = stocks.Select(s => new
-            {
-                symbol = s.Symbol,
-                quantity = s.Quantity,
-                purchasePrice = s.AverageCost,
-                currentValue = s.CurrentValue,
-                totalInvestment = s.Quantity * s.AverageCost,
-                totalCurrentValue = s.Quantity * s.CurrentValue,
-                profitLoss = (s.Quantity * s.CurrentValue) - (s.Quantity * s.AverageCost)
-            }).ToList();
-
-            return Ok(new { stocks = myStocksList });
+            return Ok(new { stocks });
         }
         catch (Exception ex)
         {
