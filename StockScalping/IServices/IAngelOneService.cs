@@ -33,4 +33,10 @@ public interface IAngelOneService
     /// </summary>
     /// <returns>List of stocks with purchase price, quantity, current price, and gain/loss</returns>
     Task<List<HoldingStock>> GetHoldingStocks();
+
+    /// <summary>
+    /// Gets all orders from the broker order book, including executed, rejected, cancelled, and pending/open orders
+    /// </summary>
+    /// <returns>List of orders with status and execution details</returns>
+    Task<List<OrderDetails>> GetOrders();
 }

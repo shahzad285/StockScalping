@@ -430,6 +430,33 @@ public class AngelOneService : IAngelOneService
         return "";
     }
 
+    private static int GetJsonIntProperty(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (element.TryGetProperty(propertyName, out var value))
+            {
+                return GetJsonInt(value);
+            }
+        }
+
+        return 0;
+    }
+
+    private static string NormalizeOrderStatus(string status)
+    {
+        var normalizedStatus = status.Trim().ToLowerInvariant();
+
+        return normalizedStatus switch
+        {
+            "complete" or "completed" or "executed" or "filled" => "Executed",
+            "rejected" => "Rejected",
+            "cancelled" or "canceled" => "Cancelled",
+            "open" or "pending" or "trigger pending" or "validation pending" or "put order req received" => "Pending",
+            _ => string.IsNullOrWhiteSpace(status) ? "Unknown" : "Other"
+        };
+    }
+
     private static IEnumerable<JsonElement> GetHoldingItems(JsonElement dataElement)
     {
         if (dataElement.ValueKind == JsonValueKind.Array)
@@ -447,21 +474,29 @@ public class AngelOneService : IAngelOneService
         return Enumerable.Empty<JsonElement>();
     }
 
+    private async Task<bool> EnsureJwtToken()
+    {
+        if (!string.IsNullOrEmpty(_jwtToken))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrEmpty(_refreshToken))
+        {
+            return false;
+        }
+
+        return await GenerateToken();
+    }
+
     public async Task<List<HoldingStock>> GetHoldingStocks()
     {
         try
         {
             // Ensure JWT token is available
-            if (string.IsNullOrEmpty(_jwtToken))
+            if (!await EnsureJwtToken())
             {
-                if (!string.IsNullOrEmpty(_refreshToken))
-                {
-                    await GenerateToken();
-                }
-                else
-                {
-                    return new List<HoldingStock>();
-                }
+                return new List<HoldingStock>();
             }
 
             SetDefaultHeaders(_jwtToken);
@@ -505,6 +540,75 @@ public class AngelOneService : IAngelOneService
         {
             System.Console.WriteLine($"Error fetching holdings: {ex.Message}");
             return new List<HoldingStock>();
+        }
+    }
+
+    public async Task<List<OrderDetails>> GetOrders()
+    {
+        try
+        {
+            if (!await EnsureJwtToken())
+            {
+                return new List<OrderDetails>();
+            }
+
+            SetDefaultHeaders(_jwtToken);
+
+            var response = await _httpClient.GetAsync("/rest/secure/angelbroking/order/v1/getOrderBook");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Console.WriteLine($"Failed to fetch orders: {response.StatusCode}");
+                System.Console.WriteLine($"Order Book Response Body: {content}");
+                return new List<OrderDetails>();
+            }
+
+            var jsonDoc = JsonDocument.Parse(content);
+            var root = jsonDoc.RootElement;
+            var orders = new List<OrderDetails>();
+
+            if (!root.TryGetProperty("data", out var dataElement) ||
+                dataElement.ValueKind != JsonValueKind.Array)
+            {
+                return orders;
+            }
+
+            foreach (var item in dataElement.EnumerateArray())
+            {
+                var status = GetJsonStringProperty(item, "orderstatus", "status");
+
+                orders.Add(new OrderDetails
+                {
+                    OrderId = GetJsonStringProperty(item, "orderid"),
+                    TradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "symbol"),
+                    Exchange = GetJsonStringProperty(item, "exchange"),
+                    TransactionType = GetJsonStringProperty(item, "transactiontype"),
+                    OrderType = GetJsonStringProperty(item, "ordertype"),
+                    ProductType = GetJsonStringProperty(item, "producttype"),
+                    Duration = GetJsonStringProperty(item, "duration"),
+                    Status = status,
+                    StatusCategory = NormalizeOrderStatus(status),
+                    RejectionReason = GetJsonStringProperty(item, "text", "rejreason", "rejectionreason"),
+                    Quantity = GetJsonIntProperty(item, "quantity"),
+                    FilledShares = GetJsonIntProperty(item, "filledshares", "filledquantity", "fillsize"),
+                    UnfilledShares = GetJsonIntProperty(item, "unfilledshares", "unfilledquantity"),
+                    CancelledShares = GetJsonIntProperty(item, "cancelsize", "cancelledshares", "cancelledquantity"),
+                    Price = GetJsonDecimalProperty(item, "price"),
+                    TriggerPrice = GetJsonDecimalProperty(item, "triggerprice"),
+                    AveragePrice = GetJsonDecimalProperty(item, "averageprice", "avgprice"),
+                    UpdateTime = GetJsonStringProperty(item, "updatetime"),
+                    ExchangeTime = GetJsonStringProperty(item, "exchtime", "exchorderupdatetime"),
+                    ParentOrderId = GetJsonStringProperty(item, "parentorderid")
+                });
+            }
+
+            return orders;
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Error fetching orders: {ex.Message}");
+            return new List<OrderDetails>();
         }
     }
 }

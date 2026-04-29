@@ -38,6 +38,20 @@ public class AccountController : ControllerBase
         }
     }
 
+    [HttpGet("orders")]
+    public async Task<IActionResult> Orders()
+    {
+        try
+        {
+            var orders = await _angelOneService.GetOrders();
+            return Ok(new { orders });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Failed to retrieve orders", error = ex.Message });
+        }
+    }
+
     [HttpGet("debug/cache")]
     public IActionResult DebugCache()
     {
