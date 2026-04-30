@@ -9,7 +9,13 @@ public interface IAngelOneService
     /// </summary>
     /// <param name="totp">Optional TOTP for first-time login</param>
     /// <returns>True if login is successful</returns>
-    Task<bool> Login(string totp = null);
+    Task<bool> Login(string? totp = null);
+
+    /// <summary>
+    /// Gets the logged-in Angel One account profile
+    /// </summary>
+    /// <returns>Account profile details if authenticated</returns>
+    Task<AccountProfile?> GetProfile();
 
     /// <summary>
     /// Gets the current price of a stock
@@ -17,6 +23,19 @@ public interface IAngelOneService
     /// <param name="symbol">Stock symbol</param>
     /// <returns>Current stock price</returns>
     Task<decimal> GetCurrentPrice(string symbol);
+
+    /// <summary>
+    /// Gets real-time LTP prices for the configured stock list
+    /// </summary>
+    /// <returns>List of stocks with latest traded prices</returns>
+    Task<List<StockPrice>> GetConfiguredStockPrices();
+
+    /// <summary>
+    /// Gets real-time LTP prices for a stock list
+    /// </summary>
+    /// <param name="stocks">Stocks to fetch</param>
+    /// <returns>List of stocks with latest traded prices</returns>
+    Task<List<StockPrice>> GetCurrentPrices(IEnumerable<StockProfile> stocks);
 
     /// <summary>
     /// Places an order for a stock

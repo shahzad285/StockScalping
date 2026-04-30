@@ -32,6 +32,7 @@ bld/
 *.nupkg
 *.snupkg
 .nuget/
+.dotnet/
 
 # Visual Studio 2022 auto-generated files
 Generated\ Files/

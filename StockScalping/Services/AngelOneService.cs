@@ -20,8 +20,8 @@ public class AngelOneService : IAngelOneService
     private readonly string _clientLocalIP;
     private readonly string _clientPublicIP;
     private readonly string _macAddress;
-    private string _refreshToken;
-    private string _jwtToken;
+    private string? _refreshToken;
+    private string? _jwtToken;
     private const string RefreshTokenCacheKey = "AngelOne_RefreshToken";
     private const string JwtTokenCacheKey = "AngelOne_JwtToken";
 
@@ -33,13 +33,13 @@ public class AngelOneService : IAngelOneService
         _httpClient.BaseAddress = new Uri("https://apiconnect.angelone.in");
         
         // Get credentials from appsettings
-        _apiKey = _config["AngelOne:ApiKey"];
-        _secretKey = _config["AngelOne:SecretKey"];
-        _clientCode = _config["AngelOne:ClientCode"];
-        _password = _config["AngelOne:Password"];
-        _clientLocalIP = _config["AngelOne:ClientLocalIP"];
-        _clientPublicIP = _config["AngelOne:ClientPublicIP"];
-        _macAddress = _config["AngelOne:MACAddress"];
+        _apiKey = _config["AngelOne:ApiKey"] ?? "";
+        _secretKey = _config["AngelOne:SecretKey"] ?? "";
+        _clientCode = _config["AngelOne:ClientCode"] ?? "";
+        _password = _config["AngelOne:Password"] ?? "";
+        _clientLocalIP = _config["AngelOne:ClientLocalIP"] ?? "";
+        _clientPublicIP = _config["AngelOne:ClientPublicIP"] ?? "";
+        _macAddress = _config["AngelOne:MACAddress"] ?? "";
         
         // Load tokens from cache
         _refreshToken = _cacheService.GetValue(RefreshTokenCacheKey);
@@ -53,7 +53,7 @@ public class AngelOneService : IAngelOneService
         System.Console.WriteLine($"  Refresh Token from cache: {(_refreshToken != null ? "EXISTS" : "NULL")}");
     }
 
-    private void SetDefaultHeaders(string token = null)
+    private void SetDefaultHeaders(string? token = null)
     {
         _httpClient.DefaultRequestHeaders.Clear();
         _httpClient.DefaultRequestHeaders.Accept.Clear();
@@ -72,7 +72,7 @@ public class AngelOneService : IAngelOneService
         }
     }
 
-    public async Task<bool> Login(string totp = null)
+    public async Task<bool> Login(string? totp = null)
     {
         try
         {
@@ -199,7 +199,10 @@ public class AngelOneService : IAngelOneService
                     {
                         _jwtToken = jwtElement.GetString();
                         System.Console.WriteLine($"JWT Token obtained (length: {_jwtToken?.Length ?? 0})");
-                        _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
+                        if (!string.IsNullOrEmpty(_jwtToken))
+                        {
+                            _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
+                        }
                         System.Console.WriteLine($"JWT Token cached with key: {JwtTokenCacheKey}");
                     }
                     
@@ -209,7 +212,10 @@ public class AngelOneService : IAngelOneService
                         System.Console.WriteLine($"Refresh Token obtained (length: {_refreshToken?.Length ?? 0})");
                         System.Console.WriteLine($"Refresh Token preview: {_refreshToken?.Substring(0, Math.Min(50, _refreshToken.Length))}...");
                         
-                        _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
+                        if (!string.IsNullOrEmpty(_refreshToken))
+                        {
+                            _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
+                        }
                         System.Console.WriteLine($"Refresh Token cached with key: {RefreshTokenCacheKey}");
                         
                         // Log token expiry information if available
@@ -308,7 +314,10 @@ public class AngelOneService : IAngelOneService
                     if (dataElement.TryGetProperty("jwtToken", out var jwtElement))
                     {
                         _jwtToken = jwtElement.GetString();
-                        _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
+                        if (!string.IsNullOrEmpty(_jwtToken))
+                        {
+                            _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
+                        }
                         System.Console.WriteLine("✅ JWT token refreshed successfully (no TOTP needed)");
                         System.Console.WriteLine($"JWT Token cached with key: {JwtTokenCacheKey}");
                         return true;
@@ -344,14 +353,333 @@ public class AngelOneService : IAngelOneService
 
     public async Task<decimal> GetCurrentPrice(string symbol)
     {
-        // Placeholder implementation
-        return 0m;
+        var prices = await GetCurrentPrices(new[]
+        {
+            new StockProfile
+            {
+                Symbol = symbol,
+                Exchange = "NSE"
+            }
+        });
+
+        return prices.FirstOrDefault()?.LastTradedPrice ?? 0m;
+    }
+
+    public async Task<AccountProfile?> GetProfile()
+    {
+        try
+        {
+            if (!await EnsureJwtToken())
+            {
+                return null;
+            }
+
+            SetDefaultHeaders(_jwtToken);
+
+            var response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                System.Console.WriteLine($"Failed to fetch profile: {response.StatusCode}");
+                System.Console.WriteLine($"Profile Response Body: {content}");
+                return null;
+            }
+
+            using var jsonDoc = JsonDocument.Parse(content);
+            var root = jsonDoc.RootElement;
+
+            if (!root.TryGetProperty("data", out var dataElement) ||
+                dataElement.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            return new AccountProfile
+            {
+                ClientCode = GetJsonStringProperty(dataElement, "clientcode", "clientCode"),
+                Name = GetJsonStringProperty(dataElement, "name", "clientname", "clientName"),
+                Email = GetJsonStringProperty(dataElement, "email", "emailid", "emailId"),
+                MobileNo = GetJsonStringProperty(dataElement, "mobileno", "mobileNo"),
+                Broker = GetJsonStringProperty(dataElement, "broker", "brokerName"),
+                Exchanges = GetJsonStringListProperty(dataElement, "exchanges", "exchange"),
+                Products = GetJsonStringListProperty(dataElement, "products", "product")
+            };
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Error fetching profile: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<List<StockPrice>> GetConfiguredStockPrices()
+    {
+        var stocks = _config.GetSection("Trading:Stocks").Get<List<StockProfile>>() ?? new List<StockProfile>();
+        return await GetCurrentPrices(stocks);
+    }
+
+    public async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<StockProfile> stocks)
+    {
+        var stockList = stocks
+            .Where(stock => !string.IsNullOrWhiteSpace(stock.Symbol) ||
+                            !string.IsNullOrWhiteSpace(stock.TradingSymbol) ||
+                            !string.IsNullOrWhiteSpace(stock.SymbolToken))
+            .ToList();
+
+        var prices = new List<StockPrice>();
+
+        if (stockList.Count == 0)
+        {
+            return prices;
+        }
+
+        if (!await EnsureJwtToken())
+        {
+            return stockList.Select(stock => new StockPrice
+            {
+                Symbol = stock.Symbol,
+                TradingSymbol = stock.TradingSymbol,
+                Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange,
+                SymbolToken = stock.SymbolToken,
+                IsFetched = false,
+                Message = "JWT token is unavailable. Login first."
+            }).ToList();
+        }
+
+        var instruments = new List<ScripInstrument>();
+
+        foreach (var stock in stockList)
+        {
+            var instrument = await ResolveInstrument(stock);
+            if (instrument == null)
+            {
+                prices.Add(new StockPrice
+                {
+                    Symbol = stock.Symbol,
+                    TradingSymbol = stock.TradingSymbol,
+                    Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange,
+                    SymbolToken = stock.SymbolToken,
+                    IsFetched = false,
+                    Message = "Unable to resolve symbol token."
+                });
+                continue;
+            }
+
+            instruments.Add(instrument);
+        }
+
+        foreach (var batch in instruments.Chunk(50))
+        {
+            var batchPrices = await FetchMarketQuoteBatch(batch);
+            prices.AddRange(batchPrices);
+        }
+
+        return prices;
     }
 
     public async Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price)
     {
         // Placeholder implementation
         return false;
+    }
+
+    private sealed class ScripInstrument
+    {
+        public string Symbol { get; set; } = "";
+        public string TradingSymbol { get; set; } = "";
+        public string Exchange { get; set; } = "";
+        public string SymbolToken { get; set; } = "";
+    }
+
+    private async Task<ScripInstrument?> ResolveInstrument(StockProfile stock)
+    {
+        var exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange.Trim().ToUpperInvariant();
+        var symbol = string.IsNullOrWhiteSpace(stock.Symbol) ? stock.TradingSymbol : stock.Symbol;
+        var tradingSymbol = string.IsNullOrWhiteSpace(stock.TradingSymbol) ? symbol : stock.TradingSymbol;
+
+        if (!string.IsNullOrWhiteSpace(stock.SymbolToken))
+        {
+            return new ScripInstrument
+            {
+                Symbol = symbol,
+                TradingSymbol = tradingSymbol,
+                Exchange = exchange,
+                SymbolToken = stock.SymbolToken.Trim()
+            };
+        }
+
+        var cacheKey = $"AngelOne_Scrip_{exchange}_{symbol}".ToUpperInvariant();
+        var cachedScrip = _cacheService.GetValue(cacheKey);
+        if (!string.IsNullOrWhiteSpace(cachedScrip))
+        {
+            var parts = cachedScrip.Split('|');
+            if (parts.Length == 3)
+            {
+                return new ScripInstrument
+                {
+                    Symbol = symbol,
+                    Exchange = parts[0],
+                    TradingSymbol = parts[1],
+                    SymbolToken = parts[2]
+                };
+            }
+        }
+
+        SetDefaultHeaders(_jwtToken);
+
+        var searchRequest = new
+        {
+            exchange = exchange,
+            searchscrip = symbol
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            "/rest/secure/angelbroking/order/v1/searchScrip",
+            searchRequest);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            System.Console.WriteLine($"Failed to resolve scrip {symbol}: {response.StatusCode}");
+            System.Console.WriteLine($"Search Scrip Response Body: {content}");
+            return null;
+        }
+
+        using var jsonDoc = JsonDocument.Parse(content);
+        var root = jsonDoc.RootElement;
+
+        if (!root.TryGetProperty("data", out var dataElement) ||
+            dataElement.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var candidates = dataElement.EnumerateArray()
+            .Select(item => new ScripInstrument
+            {
+                Symbol = symbol,
+                Exchange = GetJsonStringProperty(item, "exchange"),
+                TradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "tradingSymbol", "symbol"),
+                SymbolToken = GetJsonStringProperty(item, "symboltoken", "symbolToken")
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken))
+            .ToList();
+
+        var selected = candidates.FirstOrDefault(item =>
+                           string.Equals(item.TradingSymbol, symbol, StringComparison.OrdinalIgnoreCase)) ??
+                       candidates.FirstOrDefault(item =>
+                           string.Equals(item.TradingSymbol, $"{symbol}-EQ", StringComparison.OrdinalIgnoreCase)) ??
+                       candidates.FirstOrDefault();
+
+        if (selected != null)
+        {
+            _cacheService.SetValue(cacheKey, $"{selected.Exchange}|{selected.TradingSymbol}|{selected.SymbolToken}");
+        }
+
+        return selected;
+    }
+
+    private async Task<List<StockPrice>> FetchMarketQuoteBatch(IEnumerable<ScripInstrument> instruments)
+    {
+        var instrumentList = instruments.ToList();
+        var prices = instrumentList.Select(instrument => new StockPrice
+        {
+            Symbol = instrument.Symbol,
+            TradingSymbol = instrument.TradingSymbol,
+            Exchange = instrument.Exchange,
+            SymbolToken = instrument.SymbolToken,
+            IsFetched = false,
+            Message = "Quote not fetched."
+        }).ToList();
+
+        if (instrumentList.Count == 0)
+        {
+            return prices;
+        }
+
+        SetDefaultHeaders(_jwtToken);
+
+        var exchangeTokens = instrumentList
+            .GroupBy(instrument => instrument.Exchange)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(instrument => instrument.SymbolToken).Distinct().ToArray());
+
+        var quoteRequest = new
+        {
+            mode = "LTP",
+            exchangeTokens = exchangeTokens
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            "/rest/secure/angelbroking/market/v1/quote/",
+            quoteRequest);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            System.Console.WriteLine($"Failed to fetch market quote: {response.StatusCode}");
+            System.Console.WriteLine($"Market Quote Response Body: {content}");
+            foreach (var price in prices)
+            {
+                price.Message = $"Quote API failed with status {response.StatusCode}.";
+            }
+
+            return prices;
+        }
+
+        using var jsonDoc = JsonDocument.Parse(content);
+        var root = jsonDoc.RootElement;
+
+        if (!root.TryGetProperty("data", out var dataElement))
+        {
+            return prices;
+        }
+
+        if (dataElement.TryGetProperty("fetched", out var fetchedElement) &&
+            fetchedElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in fetchedElement.EnumerateArray())
+            {
+                var exchange = GetJsonStringProperty(item, "exchange");
+                var symbolToken = GetJsonStringProperty(item, "symbolToken", "symboltoken");
+                var price = prices.FirstOrDefault(current =>
+                    string.Equals(current.Exchange, exchange, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(current.SymbolToken, symbolToken, StringComparison.OrdinalIgnoreCase));
+
+                if (price == null)
+                {
+                    continue;
+                }
+
+                price.TradingSymbol = GetJsonStringProperty(item, "tradingSymbol", "tradingsymbol", "symbol");
+                price.LastTradedPrice = GetJsonDecimalProperty(item, "ltp", "lastTradedPrice");
+                price.IsFetched = true;
+                price.Message = "SUCCESS";
+            }
+        }
+
+        if (dataElement.TryGetProperty("unfetched", out var unfetchedElement) &&
+            unfetchedElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in unfetchedElement.EnumerateArray())
+            {
+                var exchange = GetJsonStringProperty(item, "exchange");
+                var symbolToken = GetJsonStringProperty(item, "symbolToken", "symboltoken");
+                var message = GetJsonStringProperty(item, "message", "errorMessage", "error");
+                var price = prices.FirstOrDefault(current =>
+                    string.Equals(current.Exchange, exchange, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(current.SymbolToken, symbolToken, StringComparison.OrdinalIgnoreCase));
+
+                if (price != null)
+                {
+                    price.Message = string.IsNullOrWhiteSpace(message) ? "Quote was not returned by Angel One." : message;
+                }
+            }
+        }
+
+        return prices;
     }
 
     private static string GetJsonString(JsonElement element)
@@ -428,6 +756,33 @@ public class AngelOneService : IAngelOneService
         }
 
         return "";
+    }
+
+    private static List<string> GetJsonStringListProperty(JsonElement element, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            if (!element.TryGetProperty(propertyName, out var value))
+            {
+                continue;
+            }
+
+            if (value.ValueKind == JsonValueKind.Array)
+            {
+                return value.EnumerateArray()
+                    .Select(GetJsonString)
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .ToList();
+            }
+
+            var stringValue = GetJsonString(value);
+            if (!string.IsNullOrWhiteSpace(stringValue))
+            {
+                return new List<string> { stringValue };
+            }
+        }
+
+        return new List<string>();
     }
 
     private static int GetJsonIntProperty(JsonElement element, params string[] propertyNames)
@@ -520,17 +875,47 @@ public class AngelOneService : IAngelOneService
                 foreach (var item in GetHoldingItems(dataElement))
                 {
                     var stockName = GetJsonStringProperty(item, "symbolname", "tradingsymbol", "symbol");
+                    var tradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "tradingSymbol", "symbol");
                     var purchasePrice = GetJsonDecimalProperty(item, "avgprice", "averageprice", "averagePrice");
                     var currentPrice = GetJsonDecimalProperty(item, "ltp", "currentprice", "currentPrice");
 
                     var holding = new HoldingStock
                     {
                         StockName = stockName,
+                        TradingSymbol = tradingSymbol,
+                        Exchange = GetJsonStringProperty(item, "exchange"),
+                        SymbolToken = GetJsonStringProperty(item, "symboltoken", "symbolToken"),
                         PurchasePrice = purchasePrice,
                         TotalStocks = item.TryGetProperty("quantity", out var qty) ? GetJsonInt(qty) : 0,
                         CurrentPrice = currentPrice
                     };
                     holdings.Add(holding);
+                }
+            }
+
+            var holdingPrices = await GetCurrentPrices(holdings.Select(holding => new StockProfile
+            {
+                Symbol = string.IsNullOrWhiteSpace(holding.TradingSymbol) ? holding.StockName : holding.TradingSymbol,
+                TradingSymbol = holding.TradingSymbol,
+                Exchange = holding.Exchange,
+                SymbolToken = holding.SymbolToken
+            }));
+
+            foreach (var holding in holdings)
+            {
+                var holdingPrice = holdingPrices.FirstOrDefault(price =>
+                    !string.IsNullOrWhiteSpace(holding.SymbolToken) &&
+                    string.Equals(price.SymbolToken, holding.SymbolToken, StringComparison.OrdinalIgnoreCase));
+
+                if (holdingPrice == null && !string.IsNullOrWhiteSpace(holding.TradingSymbol))
+                {
+                    holdingPrice = holdingPrices.FirstOrDefault(price =>
+                        string.Equals(price.TradingSymbol, holding.TradingSymbol, StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (holdingPrice?.IsFetched == true)
+                {
+                    holding.CurrentPrice = holdingPrice.LastTradedPrice;
                 }
             }
 

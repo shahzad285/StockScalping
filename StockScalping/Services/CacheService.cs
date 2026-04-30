@@ -25,7 +25,7 @@ public class CacheService : ICacheService
     /// </summary>
     /// <param name="key">Cache key</param>
     /// <returns>Cached value or null if not found</returns>
-    public string GetValue(string key)
+    public string? GetValue(string key)
     {
         lock (_lockObject)
         {
@@ -33,52 +33,4 @@ public class CacheService : ICacheService
         }
     }
 
-    /// <summary>
-    /// Removes a value from cache
-    /// </summary>
-    /// <param name="key">Cache key</param>
-    public void RemoveValue(string key)
-    {
-        lock (_lockObject)
-        {
-            _cache.Remove(key);
-        }
-    }
-
-    /// <summary>
-    /// Checks if a key exists in cache
-    /// </summary>
-    /// <param name="key">Cache key</param>
-    /// <returns>True if key exists</returns>
-    public bool HasKey(string key)
-    {
-        lock (_lockObject)
-        {
-            return _cache.ContainsKey(key);
-        }
-    }
-
-    /// <summary>
-    /// Gets all cached keys (for debugging)
-    /// </summary>
-    /// <returns>List of all cache keys</returns>
-    public List<string> GetAllKeys()
-    {
-        lock (_lockObject)
-        {
-            return _cache.Keys.ToList();
-        }
-    }
-
-    /// <summary>
-    /// Clears all cache (for debugging/reset)
-    /// </summary>
-    public void ClearAll()
-    {
-        lock (_lockObject)
-        {
-            _cache.Clear();
-            System.Console.WriteLine("Cache cleared");
-        }
-    }
 }

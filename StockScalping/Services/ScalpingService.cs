@@ -32,14 +32,19 @@ public class ScalpingService : BackgroundService, IScalpingService
         {
             foreach (var stock in _stocks)
             {
+                if (!stock.PurchaseRate.HasValue || !stock.SalesRate.HasValue)
+                {
+                    continue;
+                }
+
                 var currentPrice = await _angelOneService.GetCurrentPrice(stock.Symbol);
                 
-                if (currentPrice <= stock.PurchaseRate)
+                if (currentPrice <= stock.PurchaseRate.Value)
                 {
                     _logger.LogInformation($"Buy condition met for {stock.Symbol} at {currentPrice}");
                     await _angelOneService.PlaceOrder(stock.Symbol, 1, "BUY", currentPrice);
                 }
-                else if (currentPrice >= stock.SalesRate)
+                else if (currentPrice >= stock.SalesRate.Value)
                 {
                     _logger.LogInformation($"Sell condition met for {stock.Symbol} at {currentPrice}");
                     await _angelOneService.PlaceOrder(stock.Symbol, 1, "SELL", currentPrice);
