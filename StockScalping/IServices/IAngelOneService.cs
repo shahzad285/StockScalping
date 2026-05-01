@@ -2,7 +2,7 @@ using StockScalping.Models;
 
 namespace StockScalping.IServices;
 
-public interface IAngelOneService
+public interface IAngelOneService : IBrokerService
 {
     /// <summary>
     /// Logs in to Angel One API
@@ -18,13 +18,6 @@ public interface IAngelOneService
     Task<AccountProfile?> GetProfile();
 
     /// <summary>
-    /// Gets the current price of a stock
-    /// </summary>
-    /// <param name="symbol">Stock symbol</param>
-    /// <returns>Current stock price</returns>
-    Task<decimal> GetCurrentPrice(string symbol);
-
-    /// <summary>
     /// Gets real-time LTP prices for the configured stock list
     /// </summary>
     /// <returns>List of stocks with latest traded prices</returns>
@@ -36,16 +29,6 @@ public interface IAngelOneService
     /// <param name="stocks">Stocks to fetch</param>
     /// <returns>List of stocks with latest traded prices</returns>
     Task<List<StockPrice>> GetCurrentPrices(IEnumerable<StockProfile> stocks);
-
-    /// <summary>
-    /// Places an order for a stock
-    /// </summary>
-    /// <param name="symbol">Stock symbol</param>
-    /// <param name="quantity">Order quantity</param>
-    /// <param name="orderType">BUY or SELL</param>
-    /// <param name="price">Order price</param>
-    /// <returns>True if order placement is successful</returns>
-    Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price);
 
     /// <summary>
     /// Gets all stocks held in the account

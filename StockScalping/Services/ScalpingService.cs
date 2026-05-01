@@ -11,15 +11,15 @@ namespace StockScalping.Services;
 public class ScalpingService : BackgroundService, IScalpingService
 {
     private readonly ILogger<ScalpingService> _logger;
-    private readonly IAngelOneService _angelOneService;
+    private readonly IBrokerService _brokerService;
     private readonly List<StockProfile> _stocks;
 
     public ScalpingService(ILogger<ScalpingService> logger, 
-                          IAngelOneService angelOneService,
+                          IBrokerService brokerService,
                           IConfiguration config)
     {
         _logger = logger;
-        _angelOneService = angelOneService;
+        _brokerService = brokerService;
         
         // Load configured stocks from appsettings.json
         _stocks = config.GetSection("Trading:Stocks").Get<List<StockProfile>>() 
@@ -37,17 +37,17 @@ public class ScalpingService : BackgroundService, IScalpingService
                     continue;
                 }
 
-                var currentPrice = await _angelOneService.GetCurrentPrice(stock.Symbol);
+                var currentPrice = await _brokerService.GetCurrentPrice(stock.Symbol);
                 
                 if (currentPrice <= stock.PurchaseRate.Value)
                 {
                     _logger.LogInformation($"Buy condition met for {stock.Symbol} at {currentPrice}");
-                    await _angelOneService.PlaceOrder(stock.Symbol, 1, "BUY", currentPrice);
+                    await _brokerService.PlaceOrder(stock.Symbol, 1, "BUY", currentPrice);
                 }
                 else if (currentPrice >= stock.SalesRate.Value)
                 {
                     _logger.LogInformation($"Sell condition met for {stock.Symbol} at {currentPrice}");
-                    await _angelOneService.PlaceOrder(stock.Symbol, 1, "SELL", currentPrice);
+                    await _brokerService.PlaceOrder(stock.Symbol, 1, "SELL", currentPrice);
                 }
             }
             

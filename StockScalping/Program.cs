@@ -12,7 +12,18 @@ builder.Services.AddSwaggerGen();
 
 // Add our services
 builder.Services.AddSingleton<ICacheService, CacheService>();
-builder.Services.AddHttpClient<IAngelOneService, AngelOneService>();
+builder.Services.AddHttpClient<AngelOneService>();
+builder.Services.AddTransient<IAngelOneService>(serviceProvider =>
+    serviceProvider.GetRequiredService<AngelOneService>());
+builder.Services.AddTransient<IBrokerService>(serviceProvider =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var activeBroker = config["Broker:Active"] ?? "AngelOne";
+
+    return activeBroker.Equals("AngelOne", StringComparison.OrdinalIgnoreCase)
+        ? serviceProvider.GetRequiredService<AngelOneService>()
+        : throw new InvalidOperationException($"Unsupported broker '{activeBroker}'.");
+});
 builder.Services.AddHostedService<ScalpingService>();
 
 var app = builder.Build();
