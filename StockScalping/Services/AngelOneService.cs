@@ -31,7 +31,7 @@ public class AngelOneService : IAngelOneService
         _config = config;
         _cacheService = cacheService;
         _httpClient.BaseAddress = new Uri("https://apiconnect.angelone.in");
-        
+
         // Get credentials from appsettings
         _apiKey = _config["AngelOne:ApiKey"] ?? "";
         _secretKey = _config["AngelOne:SecretKey"] ?? "";
@@ -40,11 +40,11 @@ public class AngelOneService : IAngelOneService
         _clientLocalIP = _config["AngelOne:ClientLocalIP"] ?? "";
         _clientPublicIP = _config["AngelOne:ClientPublicIP"] ?? "";
         _macAddress = _config["AngelOne:MACAddress"] ?? "";
-        
+
         // Load tokens from cache
         _refreshToken = _cacheService.GetValue(RefreshTokenCacheKey);
         _jwtToken = _cacheService.GetValue(JwtTokenCacheKey);
-        
+
         System.Console.WriteLine($"AngelOne Service initialized with:");
         System.Console.WriteLine($"  LocalIP: {_clientLocalIP}");
         System.Console.WriteLine($"  PublicIP: {_clientPublicIP}");
@@ -65,7 +65,7 @@ public class AngelOneService : IAngelOneService
         _httpClient.DefaultRequestHeaders.Add("X-MACAddress", _macAddress);
         _httpClient.DefaultRequestHeaders.Add("X-PrivateKey", _apiKey);
         _httpClient.DefaultRequestHeaders.Add("X-SecretKey", _secretKey);
-        
+
         if (!string.IsNullOrEmpty(token))
         {
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
@@ -80,7 +80,7 @@ public class AngelOneService : IAngelOneService
             if (string.IsNullOrEmpty(_jwtToken))
             {
                 bool tokenSuccess;
-                
+
                 // If we have refresh token, use it (M2M mode - no manual login needed)
                 if (!string.IsNullOrEmpty(_refreshToken))
                 {
@@ -97,7 +97,7 @@ public class AngelOneService : IAngelOneService
                     }
                     tokenSuccess = await LoginWithTotp(totp);
                 }
-                
+
                 if (!tokenSuccess)
                 {
                     System.Console.WriteLine("Failed to obtain JWT token");
@@ -109,20 +109,20 @@ public class AngelOneService : IAngelOneService
             // Step 2: Call getProfile with JWT token
             SetDefaultHeaders(_jwtToken);
             var response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
-            
+
             var content = await response.Content.ReadAsStringAsync();
             System.Console.WriteLine($"Response Status: {response.StatusCode}");
             System.Console.WriteLine($"Response Body: {content}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 System.Console.WriteLine("Login failed");
                 return false;
             }
-                
+
             var jsonDoc = JsonDocument.Parse(content);
             var root = jsonDoc.RootElement;
-            
+
             // Check if API response indicates success
             if (root.TryGetProperty("status", out var statusElement))
             {
@@ -137,7 +137,7 @@ public class AngelOneService : IAngelOneService
                     return false;
                 }
             }
-            
+
             System.Console.WriteLine("Login failed");
             return false;
         }
@@ -159,9 +159,9 @@ public class AngelOneService : IAngelOneService
                 System.Console.WriteLine("Login failed");
                 return false;
             }
-            
+
             SetDefaultHeaders();
-            
+
             var loginRequest = new
             {
                 clientcode = _clientCode,
@@ -205,19 +205,19 @@ public class AngelOneService : IAngelOneService
                         }
                         System.Console.WriteLine($"JWT Token cached with key: {JwtTokenCacheKey}");
                     }
-                    
+
                     if (dataElement.TryGetProperty("refreshToken", out var refreshElement))
                     {
                         _refreshToken = refreshElement.GetString();
                         System.Console.WriteLine($"Refresh Token obtained (length: {_refreshToken?.Length ?? 0})");
                         System.Console.WriteLine($"Refresh Token preview: {_refreshToken?.Substring(0, Math.Min(50, _refreshToken.Length))}...");
-                        
+
                         if (!string.IsNullOrEmpty(_refreshToken))
                         {
                             _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
                         }
                         System.Console.WriteLine($"Refresh Token cached with key: {RefreshTokenCacheKey}");
-                        
+
                         // Log token expiry information if available
                         if (dataElement.TryGetProperty("expiresIn", out var expiryElement))
                         {
@@ -227,14 +227,14 @@ public class AngelOneService : IAngelOneService
                         {
                             System.Console.WriteLine($"Refresh Token Expiry: {refreshExpiry.GetString()}");
                         }
-                        
+
                         System.Console.WriteLine("✅ M2M mode enabled - future requests will use refresh token automatically");
                     }
                     else
                     {
                         System.Console.WriteLine("⚠️ refreshToken property NOT FOUND in login response data");
                     }
-                    
+
                     System.Console.WriteLine("Login successful, JWT token obtained");
                     return true;
                 }
@@ -272,7 +272,7 @@ public class AngelOneService : IAngelOneService
 
             // Set headers with the current JWT token in Authorization header
             SetDefaultHeaders(_jwtToken);
-            
+
             var tokenRequest = new
             {
                 refreshToken = _refreshToken
@@ -855,9 +855,9 @@ public class AngelOneService : IAngelOneService
             }
 
             SetDefaultHeaders(_jwtToken);
-            
+
             var response = await _httpClient.GetAsync("/rest/secure/angelbroking/portfolio/v1/getHolding");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 System.Console.WriteLine($"Failed to fetch holdings: {response.StatusCode}");
