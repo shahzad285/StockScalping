@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Hosting;
+
 namespace StockScalping.IServices;
 
 public interface IScalpingService : IHostedService

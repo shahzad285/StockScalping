@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.IO;
 using System.Globalization;
+using Microsoft.Extensions.Configuration;
 using StockScalping.IServices;
 using StockScalping.Models;
 
