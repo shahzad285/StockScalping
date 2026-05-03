@@ -210,14 +210,11 @@ public class AngelOneService : IAngelOneService
                     if (dataElement.TryGetProperty("refreshToken", out var refreshElement))
                     {
                         _refreshToken = refreshElement.GetString();
-                        System.Console.WriteLine($"Refresh Token obtained (length: {_refreshToken?.Length ?? 0})");
-                        System.Console.WriteLine($"Refresh Token preview: {_refreshToken?.Substring(0, Math.Min(50, _refreshToken.Length))}...");
-
-                        if (!string.IsNullOrEmpty(_refreshToken))
-                        {
-                            _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
-                        }
-                        System.Console.WriteLine($"Refresh Token cached with key: {RefreshTokenCacheKey}");
+                    if (!string.IsNullOrEmpty(_refreshToken))
+                    {
+                        _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
+                    }
+                    System.Console.WriteLine($"Refresh Token cached with key: {RefreshTokenCacheKey}");
 
                         // Log token expiry information if available
                         if (dataElement.TryGetProperty("expiresIn", out var expiryElement))
@@ -269,8 +266,6 @@ public class AngelOneService : IAngelOneService
                 return false;
             }
 
-            System.Console.WriteLine($"Using refresh token: {_refreshToken.Substring(0, Math.Min(50, _refreshToken.Length))}... (length: {_refreshToken.Length})");
-
             // Set headers with the current JWT token in Authorization header
             SetDefaultHeaders(_jwtToken);
 
@@ -281,8 +276,6 @@ public class AngelOneService : IAngelOneService
 
             var requestBody = System.Text.Json.JsonSerializer.Serialize(tokenRequest);
             System.Console.WriteLine($"Request body: {requestBody}");
-            System.Console.WriteLine($"Authorization header: Bearer {(_jwtToken != null ? _jwtToken.Substring(0, Math.Min(20, _jwtToken.Length)) : "NULL")}...");
-
             var content = new StringContent(
                 requestBody,
                 System.Text.Encoding.UTF8,
