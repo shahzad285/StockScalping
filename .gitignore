@@ -40,3 +40,7 @@ Generated\ Files/
 # ReSharper
 _ReSharper.*/
 *.DotSettings.user
+
+# Gemini CLI
+GEMINI.md
+gemini.md
