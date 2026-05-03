@@ -1,4 +1,4 @@
-namespace StockScalping.Models;
+namespace StockTrading.Models;
 
 public class HoldingStock
 {

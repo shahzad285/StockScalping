@@ -1,4 +1,4 @@
-namespace StockScalping.IServices;
+namespace StockTrading.IServices;
 
 public interface IBrokerService
 {

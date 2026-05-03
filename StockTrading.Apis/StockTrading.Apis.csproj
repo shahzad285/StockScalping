@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\StockScalping.Models\StockScalping.Models.csproj" />
-    <ProjectReference Include="..\StockScalping.Services\StockScalping.Services.csproj" />
+    <ProjectReference Include="..\StockTrading.Models\StockTrading.Models.csproj" />
+    <ProjectReference Include="..\StockTrading.Services\StockTrading.Services.csproj" />
   </ItemGroup>
 
 </Project>

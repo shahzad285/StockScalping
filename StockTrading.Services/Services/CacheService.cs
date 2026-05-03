@@ -1,6 +1,6 @@
-using StockScalping.IServices;
+using StockTrading.IServices;
 
-namespace StockScalping.Services;
+namespace StockTrading.Services;
 
 public class CacheService : ICacheService
 {

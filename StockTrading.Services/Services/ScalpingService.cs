@@ -1,13 +1,13 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using StockScalping.Models;
-using StockScalping.IServices;
+using StockTrading.Models;
+using StockTrading.IServices;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace StockScalping.Services;
+namespace StockTrading.Services;
 
 public class ScalpingService : BackgroundService, IScalpingService
 {

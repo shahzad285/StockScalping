@@ -1,0 +1,26 @@
+@StockTrading_HostAddress = http://localhost:5048
+
+GET {{StockTrading_HostAddress}}/Account/profile
+Accept: application/json
+
+###
+
+GET {{StockTrading_HostAddress}}/Stock/prices
+Accept: application/json
+
+###
+
+GET {{StockTrading_HostAddress}}/Stock/holdings
+Accept: application/json
+
+###
+
+GET {{StockTrading_HostAddress}}/Order
+Accept: application/json
+
+###
+
+GET {{StockTrading_HostAddress}}/Scalping/status
+Accept: application/json
+
+###

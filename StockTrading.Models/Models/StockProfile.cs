@@ -1,4 +1,4 @@
-namespace StockScalping.Models;
+namespace StockTrading.Models;
 
 /// <summary>
 /// Configured stock/instrument to track before requesting live market data.

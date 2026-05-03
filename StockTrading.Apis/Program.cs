@@ -1,5 +1,5 @@
-using StockScalping.Services;
-using StockScalping.IServices;
+using StockTrading.Services;
+using StockTrading.IServices;
 
 var builder = WebApplication.CreateBuilder(args);
 

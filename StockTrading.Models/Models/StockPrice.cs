@@ -1,4 +1,4 @@
-namespace StockScalping.Models;
+namespace StockTrading.Models;
 
 /// <summary>
 /// Latest live price returned by SmartAPI for a configured stock/instrument.

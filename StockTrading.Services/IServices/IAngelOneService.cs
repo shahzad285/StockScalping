@@ -1,6 +1,6 @@
-using StockScalping.Models;
+using StockTrading.Models;
 
-namespace StockScalping.IServices;
+namespace StockTrading.IServices;
 
 public interface IAngelOneService : IBrokerService
 {

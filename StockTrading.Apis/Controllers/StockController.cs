@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using StockScalping.IServices;
+using StockTrading.IServices;
 
-namespace StockScalping.Controllers;
+namespace StockTrading.Controllers;
 
 [ApiController]
 [Route("[controller]")]

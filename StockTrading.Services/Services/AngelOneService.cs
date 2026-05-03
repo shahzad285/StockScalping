@@ -4,10 +4,10 @@ using System.Text.Json;
 using System.IO;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
-using StockScalping.IServices;
-using StockScalping.Models;
+using StockTrading.IServices;
+using StockTrading.Models;
 
-namespace StockScalping.Services;
+namespace StockTrading.Services;
 
 public class AngelOneService : IAngelOneService
 {
