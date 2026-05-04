@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StockTrading.Data", "StockT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StockTrading.Repository", "StockTrading.Repository\StockTrading.Repository.csproj", "{06A8BB5C-E125-46DF-BF7C-6C98F5F6A171}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StockTrading.Common", "StockTrading.Common\StockTrading.Common.csproj", "{B3D04E5D-2E25-4DCB-9503-75240D0123D5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{06A8BB5C-E125-46DF-BF7C-6C98F5F6A171}.Release|x64.Build.0 = Release|Any CPU
 		{06A8BB5C-E125-46DF-BF7C-6C98F5F6A171}.Release|x86.ActiveCfg = Release|Any CPU
 		{06A8BB5C-E125-46DF-BF7C-6C98F5F6A171}.Release|x86.Build.0 = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|x64.Build.0 = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Debug|x86.Build.0 = Debug|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|x64.ActiveCfg = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|x64.Build.0 = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|x86.ActiveCfg = Release|Any CPU
+		{B3D04E5D-2E25-4DCB-9503-75240D0123D5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
