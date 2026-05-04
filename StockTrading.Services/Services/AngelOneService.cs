@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.IO;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using StockTrading.Common.DTOs;
 using StockTrading.IServices;
 using StockTrading.Models;
 
@@ -349,7 +350,7 @@ public class AngelOneService : IAngelOneService
     {
         var prices = await GetCurrentPrices(new[]
         {
-            new StockProfile
+            new TrackedStock
             {
                 Symbol = symbol,
                 Exchange = "NSE"
@@ -409,11 +410,11 @@ public class AngelOneService : IAngelOneService
 
     public async Task<List<StockPrice>> GetConfiguredStockPrices()
     {
-        var stocks = _config.GetSection("Trading:Stocks").Get<List<StockProfile>>() ?? new List<StockProfile>();
+        var stocks = _config.GetSection("Trading:Stocks").Get<List<TrackedStock>>() ?? new List<TrackedStock>();
         return await GetCurrentPrices(stocks);
     }
 
-    public async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<StockProfile> stocks)
+    public async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<TrackedStock> stocks)
     {
         var stockList = stocks
             .Where(stock => !string.IsNullOrWhiteSpace(stock.Symbol) ||
@@ -486,7 +487,7 @@ public class AngelOneService : IAngelOneService
         public string SymbolToken { get; set; } = "";
     }
 
-    private async Task<ScripInstrument?> ResolveInstrument(StockProfile stock)
+    private async Task<ScripInstrument?> ResolveInstrument(TrackedStock stock)
     {
         var exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange.Trim().ToUpperInvariant();
         var symbol = string.IsNullOrWhiteSpace(stock.Symbol) ? stock.TradingSymbol : stock.Symbol;
@@ -887,7 +888,7 @@ public class AngelOneService : IAngelOneService
                 }
             }
 
-            var holdingPrices = await GetCurrentPrices(holdings.Select(holding => new StockProfile
+            var holdingPrices = await GetCurrentPrices(holdings.Select(holding => new TrackedStock
             {
                 Symbol = string.IsNullOrWhiteSpace(holding.TradingSymbol) ? holding.StockName : holding.TradingSymbol,
                 TradingSymbol = holding.TradingSymbol,

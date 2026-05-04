@@ -1,9 +1,9 @@
 namespace StockTrading.Models;
 
 /// <summary>
-/// Configured stock/instrument to track before requesting live market data.
+/// Stock/instrument configured for tracking or trading.
 /// </summary>
-public class StockProfile
+public class TrackedStock
 {
     public required string Symbol { get; set; }
     public string Exchange { get; set; } = "NSE";

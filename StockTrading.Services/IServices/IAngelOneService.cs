@@ -1,3 +1,4 @@
+using StockTrading.Common.DTOs;
 using StockTrading.Models;
 
 namespace StockTrading.IServices;
@@ -28,7 +29,7 @@ public interface IAngelOneService : IBrokerService
     /// </summary>
     /// <param name="stocks">Stocks to fetch</param>
     /// <returns>List of stocks with latest traded prices</returns>
-    Task<List<StockPrice>> GetCurrentPrices(IEnumerable<StockProfile> stocks);
+    Task<List<StockPrice>> GetCurrentPrices(IEnumerable<TrackedStock> stocks);
 
     /// <summary>
     /// Gets all stocks held in the account

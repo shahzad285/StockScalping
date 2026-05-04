@@ -13,7 +13,7 @@ public class ScalpingService : BackgroundService, IScalpingService
 {
     private readonly ILogger<ScalpingService> _logger;
     private readonly IBrokerService _brokerService;
-    private readonly List<StockProfile> _stocks;
+    private readonly List<TrackedStock> _stocks;
 
     public ScalpingService(ILogger<ScalpingService> logger, 
                           IBrokerService brokerService,
@@ -23,8 +23,8 @@ public class ScalpingService : BackgroundService, IScalpingService
         _brokerService = brokerService;
         
         // Load configured stocks from appsettings.json
-        _stocks = config.GetSection("Trading:Stocks").Get<List<StockProfile>>() 
-                 ?? new List<StockProfile>();
+        _stocks = config.GetSection("Trading:Stocks").Get<List<TrackedStock>>() 
+                 ?? new List<TrackedStock>();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)

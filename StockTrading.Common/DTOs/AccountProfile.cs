@@ -1,4 +1,4 @@
-namespace StockTrading.Models;
+namespace StockTrading.Common.DTOs;
 
 /// <summary>
 /// User profile details returned by Angel One SmartAPI for the logged-in account.

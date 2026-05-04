@@ -1,4 +1,4 @@
-namespace StockTrading.Models;
+namespace StockTrading.Common.DTOs;
 
 /// <summary>
 /// Latest live price returned by SmartAPI for a configured stock/instrument.
