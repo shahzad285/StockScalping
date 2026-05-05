@@ -35,7 +35,7 @@ public interface IAngelOneService : IBrokerService
     /// Gets all stocks held in the account
     /// </summary>
     /// <returns>List of stocks with purchase price, quantity, current price, and gain/loss</returns>
-    Task<List<HoldingStock>> GetHoldingStocks();
+    Task<HoldingsResponse> GetHoldingStocks();
 
     /// <summary>
     /// Gets all orders from the broker order book, including executed, rejected, cancelled, and pending/open orders

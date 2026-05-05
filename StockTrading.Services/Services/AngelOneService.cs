@@ -839,14 +839,14 @@ public class AngelOneService : IAngelOneService
         return await GenerateToken();
     }
 
-    public async Task<List<HoldingStock>> GetHoldingStocks()
+    public async Task<HoldingsResponse> GetHoldingStocks()
     {
         try
         {
             // Ensure JWT token is available
             if (!await EnsureJwtToken())
             {
-                return new List<HoldingStock>();
+                return new HoldingsResponse();
             }
 
             SetDefaultHeaders(_jwtToken);
@@ -856,7 +856,7 @@ public class AngelOneService : IAngelOneService
             if (!response.IsSuccessStatusCode)
             {
                 System.Console.WriteLine($"Failed to fetch holdings: {response.StatusCode}");
-                return new List<HoldingStock>();
+                return new HoldingsResponse();
             }
 
             var content = await response.Content.ReadAsStringAsync();
@@ -914,12 +914,15 @@ public class AngelOneService : IAngelOneService
                 }
             }
 
-            return holdings;
+            return new HoldingsResponse
+            {
+                Stocks = holdings
+            };
         }
         catch (Exception ex)
         {
             System.Console.WriteLine($"Error fetching holdings: {ex.Message}");
-            return new List<HoldingStock>();
+            return new HoldingsResponse();
         }
     }
 

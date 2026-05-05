@@ -19,8 +19,8 @@ public class StockController : ControllerBase
     {
         try
         {
-            var stocks = await _angelOneService.GetHoldingStocks();
-            return Ok(new { stocks });
+            var holdings = await _angelOneService.GetHoldingStocks();
+            return Ok(holdings);
         }
         catch (Exception ex)
         {
