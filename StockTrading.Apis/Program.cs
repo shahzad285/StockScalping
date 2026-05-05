@@ -2,6 +2,11 @@ using StockTrading.Services;
 using StockTrading.IServices;
 using StockTrading.Data;
 using Microsoft.EntityFrameworkCore;
+using StockTrading.Apis.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +19,38 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddStockTradingData(builder.Configuration);
 
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtSecretKey))
+{
+    throw new InvalidOperationException("Jwt:SecretKey is required.");
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "StockTrading.Apis",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "StockTrading.Client",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
 // Add our services
+builder.Services.AddSingleton<IAppJwtService, AppJwtService>();
 builder.Services.AddSingleton<ICacheService, CacheService>();
 builder.Services.AddHttpClient<AngelOneService>();
 builder.Services.AddTransient<IAngelOneService>(serviceProvider =>
@@ -47,6 +83,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StockTrading.Apis.Authentication;
 using StockTrading.IServices;
 
 namespace StockTrading.Controllers;
@@ -8,18 +10,30 @@ namespace StockTrading.Controllers;
 public class AccountController : ControllerBase
 {
     private readonly IAngelOneService _angelOneService;
+    private readonly IAppJwtService _jwtService;
 
-    public AccountController(IAngelOneService angelOneService)
+    public AccountController(IAngelOneService angelOneService, IAppJwtService jwtService)
     {
         _angelOneService = angelOneService;
+        _jwtService = jwtService;
     }
 
+    [AllowAnonymous]
     [HttpGet("login")]
     public async Task<IActionResult> Login([FromQuery] string? totp = null)
     {
         var isConnected = await _angelOneService.Login(totp);
-        var message = isConnected ? "Login successful" : "Login failed";
-        return Ok(new { message = message });
+        if (!isConnected)
+        {
+            return Unauthorized(new { message = "Login failed" });
+        }
+
+        var token = _jwtService.CreateToken("AngelOne");
+        return Ok(new
+        {
+            message = "Login successful",
+            token
+        });
     }
 
     [HttpGet("profile")]
