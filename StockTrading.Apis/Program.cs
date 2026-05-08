@@ -5,6 +5,7 @@ using StockTrading.Models;
 using StockTrading.Repository.IRepository;
 using StockTrading.Repository.Repository;
 using StockTrading.Apis.Authentication;
+using StockTrading.Common.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
@@ -47,6 +48,9 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddStockTradingData(builder.Configuration);
+builder.Services.Configure<OtpSettings>(builder.Configuration.GetSection("Auth:Otp"));
+builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("Auth:Otp:Email:SendGrid"));
+builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Auth:Otp:Mobile:Twilio"));
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -88,6 +92,15 @@ builder.Services.AddScoped<IApplicationUserRepository, ApplicationUserRepository
 builder.Services.AddScoped<IApplicationRoleRepository, ApplicationRoleRepository>();
 builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>();
 builder.Services.AddScoped<ITrackedStockRepository, TrackedStockRepository>();
+builder.Services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
+builder.Services.AddHttpClient<IEmailOtpSender, SendGridEmailOtpSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.sendgrid.com/");
+});
+builder.Services.AddHttpClient<IMobileOtpSender, TwilioMobileOtpSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.twilio.com/");
+});
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IScalpingQueryService, ScalpingQueryService>();
 builder.Services.AddHttpClient<AngelOneService>();

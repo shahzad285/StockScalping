@@ -2,7 +2,9 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Settings;
 using StockTrading.IServices;
 using StockTrading.Models;
 using StockTrading.Repository.IRepository;
@@ -15,9 +17,11 @@ public sealed class AccountService(
     IAppJwtService jwtService,
     IApplicationUserRepository userRepository,
     IApplicationRoleRepository roleRepository,
-    IApplicationOtpRepository otpRepository) : IAccountService
+    IApplicationOtpRepository otpRepository,
+    IOtpDeliveryService otpDeliveryService,
+    IOptions<OtpSettings> otpSettings) : IAccountService
 {
-    private static readonly TimeSpan OtpLifetime = TimeSpan.FromMinutes(5);
+    private readonly OtpSettings _otpSettings = otpSettings.Value;
 
     public async Task<AccountServiceResult<RegisterResponse>> RegisterAsync(
         RegisterRequest request,
@@ -89,12 +93,26 @@ public sealed class AccountService(
         }
 
         var otp = GenerateOtp();
-        var expiresAtUtc = DateTime.UtcNow.Add(OtpLifetime);
+        var expiresAtUtc = DateTime.UtcNow.AddMinutes(Math.Max(1, _otpSettings.ExpiryMinutes));
+        var deliveryResult = await otpDeliveryService.SendLoginOtpAsync(
+            user,
+            request.LoginMethod,
+            otp,
+            expiresAtUtc,
+            cancellationToken);
+
+        if (!deliveryResult.IsSuccess)
+        {
+            return AccountServiceResult<RequestLoginOtpResponse>.ServiceUnavailable(
+                "OTP_DELIVERY_FAILED",
+                deliveryResult.ErrorMessage ?? "Failed to send OTP.");
+        }
+
         await otpRepository.CreateAsync(user.Id, HashOtp(otp), expiresAtUtc, cancellationToken);
 
         return AccountServiceResult<RequestLoginOtpResponse>.Ok(new RequestLoginOtpResponse(
-            "OTP generated",
-            otp,
+            "OTP sent",
+            _otpSettings.ExposeOtpInResponse ? otp : null,
             expiresAtUtc));
     }
 

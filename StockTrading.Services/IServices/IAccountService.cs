@@ -59,7 +59,7 @@ public sealed record AccountServiceResult<T>(
 public sealed record RegisterRequest(string Name, string? Email, string? PhoneNumber, string? Role);
 public sealed record RegisterResponse(string Message, string Role);
 public sealed record RequestLoginOtpRequest(LoginMethod LoginMethod, string? Email, string? PhoneNumber);
-public sealed record RequestLoginOtpResponse(string Message, string Otp, DateTime ExpiresAtUtc);
+public sealed record RequestLoginOtpResponse(string Message, string? Otp, DateTime ExpiresAtUtc);
 public sealed record LoginRequest(LoginMethod LoginMethod, string? Email, string? PhoneNumber, string? Otp, string? GoogleIdToken);
 public sealed record LoginResponse(string Message, string Token, IReadOnlyList<string> Roles);
 public sealed record MeResponse(int Id, string Name, string? Email, string? PhoneNumber, IReadOnlyList<string> Roles);
