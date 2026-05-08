@@ -3,6 +3,30 @@ import { apiRequest } from "./apiClient";
 export type LoginResponse = {
   message: string;
   token: string;
+  roles: string[];
+};
+
+export enum LoginMethod {
+  EmailOtp = 1,
+  PhoneOtp = 2,
+  GoogleOAuth = 3
+}
+
+export type RequestLoginOtpRequest = {
+  loginMethod: LoginMethod;
+  email?: string;
+  phoneNumber?: string;
+};
+
+export type RequestLoginOtpResponse = {
+  message: string;
+  otp?: string | null;
+  expiresAtUtc: string;
+};
+
+export type LoginRequest = RequestLoginOtpRequest & {
+  otp: string;
+  googleIdToken?: string;
 };
 
 export type AccountProfile = {
@@ -15,8 +39,18 @@ export type AccountProfile = {
   products: string[];
 };
 
-export async function login(totp: string): Promise<LoginResponse> {
-  return apiRequest<LoginResponse>(`/Account/login?totp=${encodeURIComponent(totp)}`);
+export async function requestLoginOtp(request: RequestLoginOtpRequest): Promise<RequestLoginOtpResponse> {
+  return apiRequest<RequestLoginOtpResponse>("/Account/login/request-otp", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
+}
+
+export async function login(request: LoginRequest): Promise<LoginResponse> {
+  return apiRequest<LoginResponse>("/Account/login", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
 }
 
 export async function getProfile(): Promise<{ profile: AccountProfile }> {

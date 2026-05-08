@@ -21,8 +21,25 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(errorText || `Request failed with status ${response.status}`);
+    throw new Error(formatApiError(errorText, response.status));
   }
 
   return response.json() as Promise<T>;
+}
+
+function formatApiError(errorText: string, status: number): string {
+  if (!errorText) {
+    return `Request failed with status ${status}`;
+  }
+
+  try {
+    const error = JSON.parse(errorText) as { message?: string; errors?: string[] };
+    if (error.errors?.length) {
+      return error.errors.join(" ");
+    }
+
+    return error.message || errorText;
+  } catch {
+    return errorText;
+  }
 }

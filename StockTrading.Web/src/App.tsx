@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, setToken } from "./auth/authStorage";
-import { AccountProfile, getProfile, login } from "./api/accountApi";
+import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp } from "./api/accountApi";
 import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
 
@@ -16,7 +16,12 @@ function formatMoney(value: number): string {
 
 function App() {
   const [token, setCurrentToken] = useState(() => getToken());
-  const [totp, setTotp] = useState("");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>(LoginMethod.EmailOtp);
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpExpiresAtUtc, setOtpExpiresAtUtc] = useState<string | null>(null);
+  const [isOtpRequested, setIsOtpRequested] = useState(false);
   const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [holdings, setHoldings] = useState<HoldingStock[]>([]);
   const [prices, setPrices] = useState<StockPrice[]>([]);
@@ -25,6 +30,7 @@ function App() {
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"error" | "success">("error");
 
   const isLoggedIn = Boolean(token);
   const positiveTotal = totalProfitLoss >= 0;
@@ -56,7 +62,37 @@ function App() {
       setPrices(pricesResult.prices);
       setOrders(ordersResult.orders);
     } catch (error) {
+      setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Unable to load dashboard.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  const isEmailLogin = loginMethod === LoginMethod.EmailOtp;
+  const loginIdentifier = isEmailLogin ? email.trim() : phoneNumber.trim();
+  const canRequestOtp = Boolean(loginIdentifier);
+  const canLogin = canRequestOtp && otp.trim().length > 0;
+
+  async function handleRequestOtp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await requestLoginOtp({
+        loginMethod,
+        email: isEmailLogin ? email.trim() : undefined,
+        phoneNumber: isEmailLogin ? undefined : phoneNumber.trim()
+      });
+      setOtp("");
+      setOtpExpiresAtUtc(result.expiresAtUtc);
+      setIsOtpRequested(true);
+      setMessageType("success");
+      setMessage(result.otp ? `OTP sent. Dev OTP: ${result.otp}` : result.message);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to send OTP.");
     } finally {
       setIsBusy(false);
     }
@@ -68,11 +104,19 @@ function App() {
     setMessage("");
 
     try {
-      const result = await login(totp);
+      const result = await login({
+        loginMethod,
+        email: isEmailLogin ? email.trim() : undefined,
+        phoneNumber: isEmailLogin ? undefined : phoneNumber.trim(),
+        otp: otp.trim()
+      });
       setToken(result.token);
       setCurrentToken(result.token);
-      setTotp("");
+      setOtp("");
+      setOtpExpiresAtUtc(null);
+      setIsOtpRequested(false);
     } catch (error) {
+      setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Login failed.");
     } finally {
       setIsBusy(false);
@@ -89,6 +133,15 @@ function App() {
     setTotalProfitLoss(0);
   }
 
+  function handleLoginMethodChange(method: LoginMethod) {
+    setLoginMethod(method);
+    setOtp("");
+    setOtpExpiresAtUtc(null);
+    setIsOtpRequested(false);
+    setMessage("");
+    setMessageType("error");
+  }
+
   useEffect(() => {
     if (isLoggedIn) {
       void loadDashboard();
@@ -101,25 +154,65 @@ function App() {
         <section className="login-panel">
           <div>
             <p className="eyebrow">StockTrading</p>
-            <h1>Broker Login</h1>
+            <h1>Login</h1>
           </div>
 
-          <form onSubmit={handleLogin} className="login-form">
-            <label htmlFor="totp">TOTP</label>
+          <div className="login-methods" role="tablist" aria-label="Login method">
+            <button
+              type="button"
+              className={isEmailLogin ? "active" : ""}
+              onClick={() => handleLoginMethodChange(LoginMethod.EmailOtp)}
+            >
+              Email
+            </button>
+            <button
+              type="button"
+              className={!isEmailLogin ? "active" : ""}
+              onClick={() => handleLoginMethodChange(LoginMethod.PhoneOtp)}
+            >
+              Mobile
+            </button>
+          </div>
+
+          <form onSubmit={handleRequestOtp} className="login-form">
+            <label htmlFor={isEmailLogin ? "email" : "phoneNumber"}>{isEmailLogin ? "Email" : "Mobile number"}</label>
             <input
-              id="totp"
-              inputMode="numeric"
-              value={totp}
-              onChange={(event) => setTotp(event.target.value)}
-              placeholder="Enter 6 digit code"
+              id={isEmailLogin ? "email" : "phoneNumber"}
+              type={isEmailLogin ? "email" : "tel"}
+              inputMode={isEmailLogin ? "email" : "tel"}
+              value={isEmailLogin ? email : phoneNumber}
+              onChange={(event) => (isEmailLogin ? setEmail(event.target.value) : setPhoneNumber(event.target.value))}
+              placeholder={isEmailLogin ? "you@example.com" : "+919876543210"}
               required
             />
-            <button type="submit" disabled={isBusy}>
+            <button type="submit" disabled={isBusy || !canRequestOtp}>
+              {isBusy ? "Sending..." : isOtpRequested ? "Resend OTP" : "Send OTP"}
+            </button>
+          </form>
+
+          <form onSubmit={handleLogin} className="login-form">
+            <label htmlFor="otp">OTP</label>
+            <input
+              id="otp"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(event) => setOtp(event.target.value)}
+              placeholder="Enter 6 digit OTP"
+              required
+            />
+            <button type="submit" disabled={isBusy || !canLogin}>
               {isBusy ? "Signing in..." : "Sign in"}
             </button>
           </form>
 
-          {message && <p className="error-text">{message}</p>}
+          {otpExpiresAtUtc && (
+            <p className="helper-text">
+              OTP expires at {new Date(otpExpiresAtUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+            </p>
+          )}
+
+          {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
         </section>
       </main>
     );
@@ -142,7 +235,7 @@ function App() {
         </div>
       </header>
 
-      {message && <p className="error-text">{message}</p>}
+      {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
 
       <section className="summary-grid">
         <article>
