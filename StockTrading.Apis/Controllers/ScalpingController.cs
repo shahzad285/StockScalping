@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using StockTrading.Data;
+using StockTrading.IServices;
 
 namespace StockTrading.Controllers;
 
@@ -8,30 +7,24 @@ namespace StockTrading.Controllers;
 [Route("[controller]")]
 public class ScalpingController : ControllerBase
 {
-    private readonly StockTradingDbContext _dbContext;
+    private readonly IScalpingQueryService _scalpingQueryService;
 
-    public ScalpingController(StockTradingDbContext dbContext)
+    public ScalpingController(IScalpingQueryService scalpingQueryService)
     {
-        _dbContext = dbContext;
+        _scalpingQueryService = scalpingQueryService;
     }
 
     [HttpGet("status")]
     public async Task<IActionResult> Status()
     {
-        var stocks = await _dbContext.TrackedStocks.ToListAsync();
-
-        return Ok(new
-        {
-            isConfigured = stocks.Count > 0,
-            trackedStocks = stocks.Count,
-            tradableStocks = stocks.Count(stock => stock.PurchaseRate.HasValue && stock.SalesRate.HasValue)
-        });
+        var status = await _scalpingQueryService.GetStatusAsync(HttpContext.RequestAborted);
+        return Ok(status);
     }
 
     [HttpGet("stocks")]
     public async Task<IActionResult> Stocks()
     {
-        var stocks = await _dbContext.TrackedStocks.ToListAsync();
+        var stocks = await _scalpingQueryService.GetStocksAsync(HttpContext.RequestAborted);
         return Ok(new { stocks });
     }
 }

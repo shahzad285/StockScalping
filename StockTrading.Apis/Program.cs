@@ -2,8 +2,8 @@ using StockTrading.Services;
 using StockTrading.IServices;
 using StockTrading.Data;
 using StockTrading.Models;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+using StockTrading.Repository.IRepository;
+using StockTrading.Repository.Repository;
 using StockTrading.Apis.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -47,18 +47,6 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddStockTradingData(builder.Configuration);
-builder.Services
-    .AddIdentity<ApplicationUser, ApplicationRole>(options =>
-    {
-        options.Password.RequiredLength = 8;
-        options.Password.RequireDigit = true;
-        options.Password.RequireLowercase = true;
-        options.Password.RequireUppercase = true;
-        options.Password.RequireNonAlphanumeric = false;
-        options.User.RequireUniqueEmail = true;
-    })
-    .AddEntityFrameworkStores<StockTradingDbContext>()
-    .AddDefaultTokenProviders();
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -96,6 +84,12 @@ builder.Services.AddAuthorization(options =>
 // Add our services
 builder.Services.AddSingleton<IAppJwtService, AppJwtService>();
 builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddScoped<IApplicationUserRepository, ApplicationUserRepository>();
+builder.Services.AddScoped<IApplicationRoleRepository, ApplicationRoleRepository>();
+builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>();
+builder.Services.AddScoped<ITrackedStockRepository, TrackedStockRepository>();
+builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IScalpingQueryService, ScalpingQueryService>();
 builder.Services.AddHttpClient<AngelOneService>();
 builder.Services.AddTransient<IAngelOneService>(serviceProvider =>
     serviceProvider.GetRequiredService<AngelOneService>());
@@ -114,9 +108,11 @@ var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<StockTradingDbContext>();
-    await dbContext.Database.MigrateAsync();
-    await SeedIdentityRolesAsync(scope.ServiceProvider);
+    var databaseInitializer = scope.ServiceProvider.GetRequiredService<IDatabaseInitializer>();
+    await databaseInitializer.InitializeAsync();
+
+    var roleRepository = scope.ServiceProvider.GetRequiredService<IApplicationRoleRepository>();
+    await roleRepository.EnsureRolesAsync([ApplicationRoleNames.Admin, ApplicationRoleNames.User]);
 }
 
 // Configure the HTTP request pipeline.
@@ -134,15 +130,3 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
-
-static async Task SeedIdentityRolesAsync(IServiceProvider serviceProvider)
-{
-    var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
-    foreach (var roleName in new[] { ApplicationRoleNames.Admin, ApplicationRoleNames.User })
-    {
-        if (!await roleManager.RoleExistsAsync(roleName))
-        {
-            await roleManager.CreateAsync(new ApplicationRole { Name = roleName });
-        }
-    }
-}

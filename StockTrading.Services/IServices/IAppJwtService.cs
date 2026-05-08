@@ -1,6 +1,6 @@
 using StockTrading.Models;
 
-namespace StockTrading.Apis.Authentication;
+namespace StockTrading.IServices;
 
 public interface IAppJwtService
 {

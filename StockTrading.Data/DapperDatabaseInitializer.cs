@@ -1,0 +1,56 @@
+using Dapper;
+
+namespace StockTrading.Data;
+
+public sealed class DapperDatabaseInitializer(IDbConnectionFactory connectionFactory) : IDatabaseInitializer
+{
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await connection.ExecuteAsync(Sql);
+    }
+
+    private const string Sql = """
+        create table if not exists roles (
+            id text primary key,
+            name varchar(100) not null unique,
+            normalized_name varchar(100) not null unique,
+            created_at_utc timestamptz not null
+        );
+
+        create table if not exists users (
+            id text primary key,
+            mobile_number varchar(20) not null unique,
+            normalized_mobile_number varchar(20) not null unique,
+            is_active boolean not null default true,
+            created_at_utc timestamptz not null
+        );
+
+        create table if not exists user_roles (
+            user_id text not null references users(id) on delete cascade,
+            role_id text not null references roles(id) on delete cascade,
+            primary key (user_id, role_id)
+        );
+
+        create table if not exists user_otps (
+            id bigserial primary key,
+            user_id text not null references users(id) on delete cascade,
+            otp_hash text not null,
+            expires_at_utc timestamptz not null,
+            consumed_at_utc timestamptz null,
+            created_at_utc timestamptz not null
+        );
+
+        create index if not exists ix_user_otps_user_id_expires_at_utc
+            on user_otps(user_id, expires_at_utc);
+
+        create table if not exists tracked_stocks (
+            symbol varchar(100) primary key,
+            exchange varchar(20) not null,
+            symbol_token varchar(100) not null,
+            trading_symbol varchar(100) not null,
+            purchase_rate numeric(18, 4) null,
+            sales_rate numeric(18, 4) null
+        );
+        """;
+}

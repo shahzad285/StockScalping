@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
+using StockTrading.IServices;
 using StockTrading.Models;
 
 namespace StockTrading.Apis.Authentication;
@@ -26,7 +27,7 @@ public class AppJwtService : IAppJwtService
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, now.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             new Claim(ClaimTypes.NameIdentifier, user.Id),
-            new Claim(ClaimTypes.Name, user.UserName ?? string.Empty)
+            new Claim(ClaimTypes.Name, user.MobileNumber)
         };
 
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));

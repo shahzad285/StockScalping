@@ -2,6 +2,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\StockTrading.Data\StockTrading.Data.csproj" />
+    <ProjectReference Include="..\StockTrading.Models\StockTrading.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
   </ItemGroup>
 
   <PropertyGroup>
