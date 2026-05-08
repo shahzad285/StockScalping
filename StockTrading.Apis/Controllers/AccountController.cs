@@ -40,7 +40,7 @@ public class AccountController : ControllerBase
         return ToActionResult(result);
     }
 
-    [Authorize(Roles = ApplicationRoleNames.Admin)]
+    [Authorize(Roles = ApplicationRoleNames.SuperAdmin)]
     [HttpPost("smartapi/login")]
     public async Task<IActionResult> SmartApiLogin(SmartApiLoginRequest request)
     {

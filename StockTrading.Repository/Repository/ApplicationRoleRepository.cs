@@ -14,6 +14,7 @@ public sealed class ApplicationRoleRepository(IDbConnectionFactory connectionFac
         {
             var role = new ApplicationRole
             {
+                Id = ApplicationRoleNames.GetRoleId(roleName),
                 Name = roleName,
                 NormalizedName = NormalizeRoleName(roleName)
             };
@@ -22,13 +23,15 @@ public sealed class ApplicationRoleRepository(IDbConnectionFactory connectionFac
                 """
                 insert into roles (id, name, normalized_name, created_at_utc)
                 values (@Id, @Name, @NormalizedName, @CreatedAtUtc)
-                on conflict (normalized_name) do nothing
+                on conflict (id) do update
+                set name = excluded.name,
+                    normalized_name = excluded.normalized_name
                 """,
                 role);
         }
     }
 
-    public async Task AddUserToRoleAsync(string userId, string roleName, CancellationToken cancellationToken = default)
+    public async Task AddUserToRoleAsync(int userId, string roleName, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(
@@ -46,7 +49,7 @@ public sealed class ApplicationRoleRepository(IDbConnectionFactory connectionFac
             });
     }
 
-    public async Task<IReadOnlyList<string>> GetUserRolesAsync(string userId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<string>> GetUserRolesAsync(int userId, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         var roles = await connection.QueryAsync<string>(

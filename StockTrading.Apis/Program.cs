@@ -73,8 +73,8 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(ApplicationRoleNames.Admin, policy =>
-        policy.RequireRole(ApplicationRoleNames.Admin));
+    options.AddPolicy(ApplicationRoleNames.SuperAdmin, policy =>
+        policy.RequireRole(ApplicationRoleNames.SuperAdmin));
 
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
@@ -112,7 +112,7 @@ using (var scope = app.Services.CreateScope())
     await databaseInitializer.InitializeAsync();
 
     var roleRepository = scope.ServiceProvider.GetRequiredService<IApplicationRoleRepository>();
-    await roleRepository.EnsureRolesAsync([ApplicationRoleNames.Admin, ApplicationRoleNames.User]);
+    await roleRepository.EnsureRolesAsync([ApplicationRoleNames.SuperAdmin, ApplicationRoleNames.User]);
 }
 
 // Configure the HTTP request pipeline.

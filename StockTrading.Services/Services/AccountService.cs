@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using StockTrading.Common.DTOs;
 using StockTrading.IServices;
 using StockTrading.Models;
@@ -9,6 +10,7 @@ using StockTrading.Repository.IRepository;
 namespace StockTrading.Services;
 
 public sealed class AccountService(
+    IConfiguration configuration,
     IAngelOneService angelOneService,
     IAppJwtService jwtService,
     IApplicationUserRepository userRepository,
@@ -22,35 +24,54 @@ public sealed class AccountService(
         ClaimsPrincipal user,
         CancellationToken cancellationToken = default)
     {
-        var validationErrors = ValidateMobileNumber(request.MobileNumber);
+        var validationErrors = ValidateUser(request);
         if (validationErrors.Count > 0)
         {
             return AccountServiceResult<RegisterResponse>.BadRequest("Registration failed", validationErrors);
         }
 
         var hasUsers = await userRepository.AnyAsync(cancellationToken);
-        if (hasUsers && !user.IsInRole(ApplicationRoleNames.Admin))
+        if (hasUsers && !user.IsInRole(ApplicationRoleNames.SuperAdmin))
         {
             return AccountServiceResult<RegisterResponse>.Forbidden();
         }
 
-        var existingUser = await userRepository.GetByMobileNumberAsync(request.MobileNumber, cancellationToken);
-        if (existingUser != null)
+        var isConfiguredSuperAdmin = IsConfiguredSuperAdminEmail(request.Email);
+        if (!hasUsers && !isConfiguredSuperAdmin)
         {
-            return AccountServiceResult<RegisterResponse>.BadRequest("Registration failed", ["Mobile number already exists"]);
+            return AccountServiceResult<RegisterResponse>.Unauthorized("Only the configured superadmin can create the first user.");
         }
 
-        var roleName = hasUsers
-            ? NormalizeRoleName(request.Role)
-            : ApplicationRoleNames.Admin;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var existingEmailUser = await userRepository.GetByEmailAsync(request.Email, cancellationToken);
+            if (existingEmailUser != null)
+            {
+                return AccountServiceResult<RegisterResponse>.BadRequest("Registration failed", ["Email already exists"]);
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            var existingPhoneUser = await userRepository.GetByPhoneNumberAsync(request.PhoneNumber, cancellationToken);
+            if (existingPhoneUser != null)
+            {
+                return AccountServiceResult<RegisterResponse>.BadRequest("Registration failed", ["Phone number already exists"]);
+            }
+        }
+
+        var roleName = isConfiguredSuperAdmin
+            ? ApplicationRoleNames.SuperAdmin
+            : ApplicationRoleNames.User;
 
         var applicationUser = new ApplicationUser
         {
-            MobileNumber = request.MobileNumber.Trim(),
-            NormalizedMobileNumber = NormalizeMobileNumber(request.MobileNumber)
+            Name = request.Name.Trim(),
+            Email = request.Email?.Trim(),
+            PhoneNumber = request.PhoneNumber?.Trim()
         };
 
-        await roleRepository.EnsureRolesAsync([ApplicationRoleNames.Admin, ApplicationRoleNames.User], cancellationToken);
+        await roleRepository.EnsureRolesAsync([ApplicationRoleNames.SuperAdmin, ApplicationRoleNames.User], cancellationToken);
         await userRepository.AddAsync(applicationUser, cancellationToken);
         await roleRepository.AddUserToRoleAsync(applicationUser.Id, roleName, cancellationToken);
 
@@ -61,10 +82,10 @@ public sealed class AccountService(
         RequestLoginOtpRequest request,
         CancellationToken cancellationToken = default)
     {
-        var user = await userRepository.GetByMobileNumberAsync(request.MobileNumber, cancellationToken);
+        var user = await GetUserForOtpLoginAsync(request.LoginMethod, request.Email, request.PhoneNumber, cancellationToken);
         if (user == null || !user.IsActive)
         {
-            return AccountServiceResult<RequestLoginOtpResponse>.Unauthorized("Invalid mobile number");
+            return AccountServiceResult<RequestLoginOtpResponse>.Unauthorized("Invalid login details");
         }
 
         var otp = GenerateOtp();
@@ -81,10 +102,20 @@ public sealed class AccountService(
         LoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        var user = await userRepository.GetByMobileNumberAsync(request.MobileNumber, cancellationToken);
+        if (request.LoginMethod == LoginMethod.GoogleOAuth)
+        {
+            return AccountServiceResult<LoginResponse>.BadRequest("Google OAuth login is not wired yet.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Otp))
+        {
+            return AccountServiceResult<LoginResponse>.BadRequest("Login failed", ["OTP is required"]);
+        }
+
+        var user = await GetUserForOtpLoginAsync(request.LoginMethod, request.Email, request.PhoneNumber, cancellationToken);
         if (user == null || !user.IsActive)
         {
-            return AccountServiceResult<LoginResponse>.Unauthorized("Invalid mobile number or OTP");
+            return AccountServiceResult<LoginResponse>.Unauthorized("Invalid login details or OTP");
         }
 
         var nowUtc = DateTime.UtcNow;
@@ -96,7 +127,7 @@ public sealed class AccountService(
 
         await otpRepository.MarkConsumedAsync(otpId.Value, nowUtc, cancellationToken);
 
-        var roles = await roleRepository.GetUserRolesAsync(user.Id, cancellationToken);
+        var roles = GetEffectiveRoles(user);
         var token = jwtService.CreateToken(user, roles);
 
         return AccountServiceResult<LoginResponse>.Ok(new LoginResponse("Login successful", token, roles));
@@ -107,19 +138,24 @@ public sealed class AccountService(
         CancellationToken cancellationToken = default)
     {
         var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrWhiteSpace(userId))
+        if (!int.TryParse(userId, out var parsedUserId))
         {
             return AccountServiceResult<MeResponse>.Unauthorized("User not found");
         }
 
-        var applicationUser = await userRepository.GetByIdAsync(userId, cancellationToken);
+        var applicationUser = await userRepository.GetByIdAsync(parsedUserId, cancellationToken);
         if (applicationUser == null)
         {
             return AccountServiceResult<MeResponse>.Unauthorized("User not found");
         }
 
-        var roles = await roleRepository.GetUserRolesAsync(applicationUser.Id, cancellationToken);
-        return AccountServiceResult<MeResponse>.Ok(new MeResponse(applicationUser.Id, applicationUser.MobileNumber, roles));
+        var roles = GetEffectiveRoles(applicationUser);
+        return AccountServiceResult<MeResponse>.Ok(new MeResponse(
+            applicationUser.Id,
+            applicationUser.Name,
+            applicationUser.Email,
+            applicationUser.PhoneNumber,
+            roles));
     }
 
     public async Task<AccountServiceResult<object>> SmartApiLoginAsync(
@@ -144,7 +180,7 @@ public sealed class AccountService(
                 return AccountServiceResult<AccountProfile>.Ok(profile);
             }
 
-            var message = user.IsInRole(ApplicationRoleNames.Admin)
+            var message = user.IsInRole(ApplicationRoleNames.SuperAdmin)
                 ? "Broker session expired. Please login to SmartAPI again using TOTP."
                 : "Broker session expired. Please contact admin.";
 
@@ -156,26 +192,59 @@ public sealed class AccountService(
         }
     }
 
-    private static List<string> ValidateMobileNumber(string mobileNumber)
+    private static List<string> ValidateUser(RegisterRequest request)
     {
-        if (string.IsNullOrWhiteSpace(mobileNumber))
+        var errors = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return ["Mobile number is required"];
+            errors.Add("Name is required");
         }
 
-        return [];
+        if (string.IsNullOrWhiteSpace(request.Email) && string.IsNullOrWhiteSpace(request.PhoneNumber))
+        {
+            errors.Add("Email or phone number is required");
+        }
+
+        return errors;
     }
 
-    private static string NormalizeRoleName(string? role)
+    private async Task<ApplicationUser?> GetUserForOtpLoginAsync(
+        LoginMethod loginMethod,
+        string? email,
+        string? phoneNumber,
+        CancellationToken cancellationToken)
     {
-        return string.Equals(role, ApplicationRoleNames.Admin, StringComparison.OrdinalIgnoreCase)
-            ? ApplicationRoleNames.Admin
-            : ApplicationRoleNames.User;
+        if (loginMethod == LoginMethod.EmailOtp)
+        {
+            return string.IsNullOrWhiteSpace(email)
+                ? null
+                : await userRepository.GetByEmailAsync(email, cancellationToken);
+        }
+
+        if (loginMethod == LoginMethod.PhoneOtp)
+        {
+            return string.IsNullOrWhiteSpace(phoneNumber)
+                ? null
+                : await userRepository.GetByPhoneNumberAsync(phoneNumber, cancellationToken);
+        }
+
+        return null;
     }
 
-    private static string NormalizeMobileNumber(string mobileNumber)
+    private bool IsConfiguredSuperAdminEmail(string? email)
     {
-        return mobileNumber.Trim();
+        var superAdminEmail = configuration["Auth:SuperAdminEmail"];
+        return !string.IsNullOrWhiteSpace(email)
+            && !string.IsNullOrWhiteSpace(superAdminEmail)
+            && string.Equals(email.Trim(), superAdminEmail.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyList<string> GetEffectiveRoles(ApplicationUser user)
+    {
+        return IsConfiguredSuperAdminEmail(user.Email)
+            ? [ApplicationRoleNames.SuperAdmin]
+            : [ApplicationRoleNames.User];
     }
 
     private static string GenerateOtp()

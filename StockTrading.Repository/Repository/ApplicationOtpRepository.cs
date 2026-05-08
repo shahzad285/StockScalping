@@ -6,7 +6,7 @@ namespace StockTrading.Repository.Repository;
 
 public sealed class ApplicationOtpRepository(IDbConnectionFactory connectionFactory) : IApplicationOtpRepository
 {
-    public async Task CreateAsync(string userId, string otpHash, DateTime expiresAtUtc, CancellationToken cancellationToken = default)
+    public async Task CreateAsync(int userId, string otpHash, DateTime expiresAtUtc, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(
@@ -33,7 +33,7 @@ public sealed class ApplicationOtpRepository(IDbConnectionFactory connectionFact
             });
     }
 
-    public async Task<long?> GetValidOtpIdAsync(string userId, string otpHash, DateTime nowUtc, CancellationToken cancellationToken = default)
+    public async Task<long?> GetValidOtpIdAsync(int userId, string otpHash, DateTime nowUtc, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<long?>(

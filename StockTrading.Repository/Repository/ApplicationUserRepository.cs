@@ -13,15 +13,18 @@ public sealed class ApplicationUserRepository(IDbConnectionFactory connectionFac
         return await connection.ExecuteScalarAsync<bool>("select exists(select 1 from users)");
     }
 
-    public async Task<ApplicationUser?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    public async Task<ApplicationUser?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<ApplicationUser>(
             """
             select
                 id,
-                mobile_number as MobileNumber,
-                normalized_mobile_number as NormalizedMobileNumber,
+                name,
+                email,
+                normalized_email as NormalizedEmail,
+                phone_number as PhoneNumber,
+                normalized_phone_number as NormalizedPhoneNumber,
                 is_active as IsActive,
                 created_at_utc as CreatedAtUtc
             from users
@@ -30,50 +33,88 @@ public sealed class ApplicationUserRepository(IDbConnectionFactory connectionFac
             new { Id = id });
     }
 
-    public async Task<ApplicationUser?> GetByMobileNumberAsync(string mobileNumber, CancellationToken cancellationToken = default)
+    public async Task<ApplicationUser?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<ApplicationUser>(
             """
             select
                 id,
-                mobile_number as MobileNumber,
-                normalized_mobile_number as NormalizedMobileNumber,
+                name,
+                email,
+                normalized_email as NormalizedEmail,
+                phone_number as PhoneNumber,
+                normalized_phone_number as NormalizedPhoneNumber,
                 is_active as IsActive,
                 created_at_utc as CreatedAtUtc
             from users
-            where normalized_mobile_number = @NormalizedMobileNumber
+            where normalized_email = @NormalizedEmail
             """,
-            new { NormalizedMobileNumber = NormalizeMobileNumber(mobileNumber) });
+            new { NormalizedEmail = NormalizeEmail(email) });
+    }
+
+    public async Task<ApplicationUser?> GetByPhoneNumberAsync(string phoneNumber, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        return await connection.QuerySingleOrDefaultAsync<ApplicationUser>(
+            """
+            select
+                id,
+                name,
+                email,
+                normalized_email as NormalizedEmail,
+                phone_number as PhoneNumber,
+                normalized_phone_number as NormalizedPhoneNumber,
+                is_active as IsActive,
+                created_at_utc as CreatedAtUtc
+            from users
+            where normalized_phone_number = @NormalizedPhoneNumber
+            """,
+            new { NormalizedPhoneNumber = NormalizePhoneNumber(phoneNumber) });
     }
 
     public async Task AddAsync(ApplicationUser user, CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
-        user.NormalizedMobileNumber = NormalizeMobileNumber(user.MobileNumber);
+        user.NormalizedEmail = NormalizeEmail(user.Email);
+        user.NormalizedPhoneNumber = NormalizePhoneNumber(user.PhoneNumber);
 
-        await connection.ExecuteAsync(
+        user.Id = await connection.ExecuteScalarAsync<int>(
             """
             insert into users (
-                id,
-                mobile_number,
-                normalized_mobile_number,
+                name,
+                email,
+                normalized_email,
+                phone_number,
+                normalized_phone_number,
                 is_active,
                 created_at_utc
             )
             values (
-                @Id,
-                @MobileNumber,
-                @NormalizedMobileNumber,
+                @Name,
+                @Email,
+                @NormalizedEmail,
+                @PhoneNumber,
+                @NormalizedPhoneNumber,
                 @IsActive,
                 @CreatedAtUtc
             )
+            returning id
             """,
             user);
     }
 
-    private static string NormalizeMobileNumber(string mobileNumber)
+    private static string? NormalizeEmail(string? email)
     {
-        return mobileNumber.Trim();
+        return string.IsNullOrWhiteSpace(email)
+            ? null
+            : email.Trim().ToUpperInvariant();
+    }
+
+    private static string? NormalizePhoneNumber(string? phoneNumber)
+    {
+        return string.IsNullOrWhiteSpace(phoneNumber)
+            ? null
+            : phoneNumber.Trim();
     }
 }

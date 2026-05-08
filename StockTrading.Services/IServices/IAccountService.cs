@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using StockTrading.Common.DTOs;
+using StockTrading.Models;
 
 namespace StockTrading.IServices;
 
@@ -55,11 +56,11 @@ public sealed record AccountServiceResult<T>(
     }
 }
 
-public sealed record RegisterRequest(string MobileNumber, string? Role);
+public sealed record RegisterRequest(string Name, string? Email, string? PhoneNumber, string? Role);
 public sealed record RegisterResponse(string Message, string Role);
-public sealed record RequestLoginOtpRequest(string MobileNumber);
+public sealed record RequestLoginOtpRequest(LoginMethod LoginMethod, string? Email, string? PhoneNumber);
 public sealed record RequestLoginOtpResponse(string Message, string Otp, DateTime ExpiresAtUtc);
-public sealed record LoginRequest(string MobileNumber, string Otp);
+public sealed record LoginRequest(LoginMethod LoginMethod, string? Email, string? PhoneNumber, string? Otp, string? GoogleIdToken);
 public sealed record LoginResponse(string Message, string Token, IReadOnlyList<string> Roles);
-public sealed record MeResponse(string Id, string MobileNumber, IReadOnlyList<string> Roles);
+public sealed record MeResponse(int Id, string Name, string? Email, string? PhoneNumber, IReadOnlyList<string> Roles);
 public sealed record SmartApiLoginRequest(string? Totp);
