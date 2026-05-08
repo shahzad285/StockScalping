@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using StockTrading.Models;
 
 namespace StockTrading.Data;
 
-public class StockTradingDbContext(DbContextOptions<StockTradingDbContext> options) : DbContext(options)
+public class StockTradingDbContext(DbContextOptions<StockTradingDbContext> options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, string>(options)
 {
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderHistory> OrderHistories => Set<OrderHistory>();
@@ -12,6 +15,88 @@ public class StockTradingDbContext(DbContextOptions<StockTradingDbContext> optio
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.ToTable("users");
+
+            entity.Property(user => user.Id).HasColumnName("id");
+            entity.Property(user => user.UserName).HasColumnName("user_name").HasMaxLength(256);
+            entity.Property(user => user.NormalizedUserName).HasColumnName("normalized_user_name").HasMaxLength(256);
+            entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(256);
+            entity.Property(user => user.NormalizedEmail).HasColumnName("normalized_email").HasMaxLength(256);
+            entity.Property(user => user.EmailConfirmed).HasColumnName("email_confirmed");
+            entity.Property(user => user.PasswordHash).HasColumnName("password_hash");
+            entity.Property(user => user.SecurityStamp).HasColumnName("security_stamp");
+            entity.Property(user => user.ConcurrencyStamp).HasColumnName("concurrency_stamp");
+            entity.Property(user => user.PhoneNumber).HasColumnName("phone_number");
+            entity.Property(user => user.PhoneNumberConfirmed).HasColumnName("phone_number_confirmed");
+            entity.Property(user => user.TwoFactorEnabled).HasColumnName("two_factor_enabled");
+            entity.Property(user => user.LockoutEnd).HasColumnName("lockout_end");
+            entity.Property(user => user.LockoutEnabled).HasColumnName("lockout_enabled");
+            entity.Property(user => user.AccessFailedCount).HasColumnName("access_failed_count");
+            entity.Property(user => user.IsActive).HasColumnName("is_active");
+            entity.Property(user => user.CreatedAtUtc).HasColumnName("created_at_utc");
+        });
+
+        modelBuilder.Entity<ApplicationRole>(entity =>
+        {
+            entity.ToTable("roles");
+
+            entity.Property(role => role.Id).HasColumnName("id");
+            entity.Property(role => role.Name).HasColumnName("name").HasMaxLength(256);
+            entity.Property(role => role.NormalizedName).HasColumnName("normalized_name").HasMaxLength(256);
+            entity.Property(role => role.ConcurrencyStamp).HasColumnName("concurrency_stamp");
+            entity.Property(role => role.CreatedAtUtc).HasColumnName("created_at_utc");
+        });
+
+        modelBuilder.Entity<IdentityUserRole<string>>(entity =>
+        {
+            entity.ToTable("user_roles");
+
+            entity.Property(userRole => userRole.UserId).HasColumnName("user_id");
+            entity.Property(userRole => userRole.RoleId).HasColumnName("role_id");
+        });
+
+        modelBuilder.Entity<IdentityUserClaim<string>>(entity =>
+        {
+            entity.ToTable("user_claims");
+
+            entity.Property(userClaim => userClaim.Id).HasColumnName("id");
+            entity.Property(userClaim => userClaim.UserId).HasColumnName("user_id");
+            entity.Property(userClaim => userClaim.ClaimType).HasColumnName("claim_type");
+            entity.Property(userClaim => userClaim.ClaimValue).HasColumnName("claim_value");
+        });
+
+        modelBuilder.Entity<IdentityRoleClaim<string>>(entity =>
+        {
+            entity.ToTable("role_claims");
+
+            entity.Property(roleClaim => roleClaim.Id).HasColumnName("id");
+            entity.Property(roleClaim => roleClaim.RoleId).HasColumnName("role_id");
+            entity.Property(roleClaim => roleClaim.ClaimType).HasColumnName("claim_type");
+            entity.Property(roleClaim => roleClaim.ClaimValue).HasColumnName("claim_value");
+        });
+
+        modelBuilder.Entity<IdentityUserLogin<string>>(entity =>
+        {
+            entity.ToTable("user_logins");
+
+            entity.Property(userLogin => userLogin.LoginProvider).HasColumnName("login_provider");
+            entity.Property(userLogin => userLogin.ProviderKey).HasColumnName("provider_key");
+            entity.Property(userLogin => userLogin.ProviderDisplayName).HasColumnName("provider_display_name");
+            entity.Property(userLogin => userLogin.UserId).HasColumnName("user_id");
+        });
+
+        modelBuilder.Entity<IdentityUserToken<string>>(entity =>
+        {
+            entity.ToTable("user_tokens");
+
+            entity.Property(userToken => userToken.UserId).HasColumnName("user_id");
+            entity.Property(userToken => userToken.LoginProvider).HasColumnName("login_provider");
+            entity.Property(userToken => userToken.Name).HasColumnName("name");
+            entity.Property(userToken => userToken.Value).HasColumnName("value");
+        });
 
         modelBuilder.Entity<TrackedStock>(entity =>
         {

@@ -1,6 +1,8 @@
 using StockTrading.Services;
 using StockTrading.IServices;
 using StockTrading.Data;
+using StockTrading.Models;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using StockTrading.Apis.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -45,6 +47,18 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 builder.Services.AddStockTradingData(builder.Configuration);
+builder.Services
+    .AddIdentity<ApplicationUser, ApplicationRole>(options =>
+    {
+        options.Password.RequiredLength = 8;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false;
+        options.User.RequireUniqueEmail = true;
+    })
+    .AddEntityFrameworkStores<StockTradingDbContext>()
+    .AddDefaultTokenProviders();
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -71,6 +85,9 @@ builder.Services
 
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy(ApplicationRoleNames.Admin, policy =>
+        policy.RequireRole(ApplicationRoleNames.Admin));
+
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
@@ -99,6 +116,7 @@ using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<StockTradingDbContext>();
     await dbContext.Database.MigrateAsync();
+    await SeedIdentityRolesAsync(scope.ServiceProvider);
 }
 
 // Configure the HTTP request pipeline.
@@ -116,3 +134,15 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static async Task SeedIdentityRolesAsync(IServiceProvider serviceProvider)
+{
+    var roleManager = serviceProvider.GetRequiredService<RoleManager<ApplicationRole>>();
+    foreach (var roleName in new[] { ApplicationRoleNames.Admin, ApplicationRoleNames.User })
+    {
+        if (!await roleManager.RoleExistsAsync(roleName))
+        {
+            await roleManager.CreateAsync(new ApplicationRole { Name = roleName });
+        }
+    }
+}
