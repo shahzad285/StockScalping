@@ -70,6 +70,8 @@ function App() {
   }
 
   const isEmailLogin = loginMethod === LoginMethod.EmailOtp;
+  const isPhoneLogin = loginMethod === LoginMethod.PhoneOtp;
+  const isGoogleLogin = loginMethod === LoginMethod.GoogleOAuth;
   const loginIdentifier = isEmailLogin ? email.trim() : phoneNumber.trim();
   const canRequestOtp = Boolean(loginIdentifier);
   const canLogin = canRequestOtp && otp.trim().length > 0;
@@ -161,55 +163,76 @@ function App() {
             <button
               type="button"
               className={isEmailLogin ? "active" : ""}
+              aria-selected={isEmailLogin}
               onClick={() => handleLoginMethodChange(LoginMethod.EmailOtp)}
             >
               Email
             </button>
             <button
               type="button"
-              className={!isEmailLogin ? "active" : ""}
+              className={isPhoneLogin ? "active" : ""}
+              aria-selected={isPhoneLogin}
               onClick={() => handleLoginMethodChange(LoginMethod.PhoneOtp)}
             >
               Mobile
             </button>
+            <button
+              type="button"
+              className={isGoogleLogin ? "active" : ""}
+              aria-selected={isGoogleLogin}
+              onClick={() => handleLoginMethodChange(LoginMethod.GoogleOAuth)}
+            >
+              Google
+            </button>
           </div>
 
-          <form onSubmit={handleRequestOtp} className="login-form">
-            <label htmlFor={isEmailLogin ? "email" : "phoneNumber"}>{isEmailLogin ? "Email" : "Mobile number"}</label>
-            <input
-              id={isEmailLogin ? "email" : "phoneNumber"}
-              type={isEmailLogin ? "email" : "tel"}
-              inputMode={isEmailLogin ? "email" : "tel"}
-              value={isEmailLogin ? email : phoneNumber}
-              onChange={(event) => (isEmailLogin ? setEmail(event.target.value) : setPhoneNumber(event.target.value))}
-              placeholder={isEmailLogin ? "you@example.com" : "+919876543210"}
-              required
-            />
-            <button type="submit" disabled={isBusy || !canRequestOtp}>
-              {isBusy ? "Sending..." : isOtpRequested ? "Resend OTP" : "Send OTP"}
-            </button>
-          </form>
+          {isGoogleLogin ? (
+            <div className="oauth-panel">
+              <button type="button" disabled>
+                Continue with Google
+              </button>
+              <p className="helper-text">Google OAuth is configured as a login method, but the server flow is not wired yet.</p>
+            </div>
+          ) : (
+            <>
+              <form onSubmit={handleRequestOtp} className="login-form">
+                <label htmlFor={isEmailLogin ? "email" : "phoneNumber"}>{isEmailLogin ? "Email" : "Mobile number"}</label>
+                <input
+                  id={isEmailLogin ? "email" : "phoneNumber"}
+                  type={isEmailLogin ? "email" : "tel"}
+                  inputMode={isEmailLogin ? "email" : "tel"}
+                  value={isEmailLogin ? email : phoneNumber}
+                  onChange={(event) => (isEmailLogin ? setEmail(event.target.value) : setPhoneNumber(event.target.value))}
+                  placeholder={isEmailLogin ? "you@example.com" : "+919876543210"}
+                  required
+                />
+                <button type="submit" disabled={isBusy || !canRequestOtp}>
+                  {isBusy ? "Sending..." : isOtpRequested ? "Resend OTP" : "Send OTP"}
+                </button>
+              </form>
 
-          <form onSubmit={handleLogin} className="login-form">
-            <label htmlFor="otp">OTP</label>
-            <input
-              id="otp"
-              inputMode="numeric"
-              maxLength={6}
-              value={otp}
-              onChange={(event) => setOtp(event.target.value)}
-              placeholder="Enter 6 digit OTP"
-              required
-            />
-            <button type="submit" disabled={isBusy || !canLogin}>
-              {isBusy ? "Signing in..." : "Sign in"}
-            </button>
-          </form>
+              <form onSubmit={handleLogin} className="login-form">
+                <label htmlFor="otp">OTP</label>
+                <input
+                  id="otp"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(event) => setOtp(event.target.value)}
+                  placeholder="Enter 6 digit OTP"
+                  required
+                />
+                <button type="submit" disabled={isBusy || !canLogin}>
+                  {isBusy ? "Signing in..." : "Sign in"}
+                </button>
+              </form>
 
-          {otpExpiresAtUtc && (
-            <p className="helper-text">
-              OTP expires at {new Date(otpExpiresAtUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
-            </p>
+              {otpExpiresAtUtc && (
+                <p className="helper-text">
+                  OTP expires at {new Date(otpExpiresAtUtc).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.
+                </p>
+              )}
+            </>
           )}
 
           {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
