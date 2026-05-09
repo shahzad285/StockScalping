@@ -21,11 +21,19 @@ public sealed class ApplicationRoleRepository(IDbConnectionFactory connectionFac
 
             await connection.ExecuteAsync(
                 """
+                update roles
+                set normalized_name = @NormalizedName
+                where name = @Name;
+
                 insert into roles (id, name, normalized_name, created_at_utc)
-                values (@Id, @Name, @NormalizedName, @CreatedAtUtc)
-                on conflict (id) do update
-                set name = excluded.name,
-                    normalized_name = excluded.normalized_name
+                select @Id, @Name, @NormalizedName, @CreatedAtUtc
+                where not exists (
+                    select 1
+                    from roles
+                    where id = @Id
+                       or name = @Name
+                       or normalized_name = @NormalizedName
+                )
                 """,
                 role);
         }

@@ -15,6 +15,7 @@ public class AngelOneService : IBrokerService
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _config;
     private readonly ICacheService _cacheService;
+    private readonly IBrokerSessionStore _brokerSessionStore;
     private readonly string _apiKey;
     private readonly string _secretKey;
     private readonly string _clientCode;
@@ -24,14 +25,19 @@ public class AngelOneService : IBrokerService
     private readonly string _macAddress;
     private string? _refreshToken;
     private string? _jwtToken;
-    private const string RefreshTokenCacheKey = "AngelOne_RefreshToken";
-    private const string JwtTokenCacheKey = "AngelOne_JwtToken";
+    private string? _feedToken;
+    private const string BrokerName = "AngelOne";
 
-    public AngelOneService(HttpClient httpClient, IConfiguration config, ICacheService cacheService)
+    public AngelOneService(
+        HttpClient httpClient,
+        IConfiguration config,
+        ICacheService cacheService,
+        IBrokerSessionStore brokerSessionStore)
     {
         _httpClient = httpClient;
         _config = config;
         _cacheService = cacheService;
+        _brokerSessionStore = brokerSessionStore;
         _httpClient.BaseAddress = new Uri("https://apiconnect.angelone.in");
 
         // Get credentials from appsettings
@@ -43,16 +49,10 @@ public class AngelOneService : IBrokerService
         _clientPublicIP = _config["AngelOne:ClientPublicIP"] ?? "";
         _macAddress = _config["AngelOne:MACAddress"] ?? "";
 
-        // Load tokens from cache
-        _refreshToken = _cacheService.GetValue(RefreshTokenCacheKey);
-        _jwtToken = _cacheService.GetValue(JwtTokenCacheKey);
-
         System.Console.WriteLine($"AngelOne Service initialized with:");
         System.Console.WriteLine($"  LocalIP: {_clientLocalIP}");
         System.Console.WriteLine($"  PublicIP: {_clientPublicIP}");
         System.Console.WriteLine($"  MAC: {_macAddress}");
-        System.Console.WriteLine($"  JWT Token from cache: {(_jwtToken != null ? "EXISTS" : "NULL")}");
-        System.Console.WriteLine($"  Refresh Token from cache: {(_refreshToken != null ? "EXISTS" : "NULL")}");
     }
 
     private void SetDefaultHeaders(string? token = null)
@@ -78,6 +78,8 @@ public class AngelOneService : IBrokerService
     {
         try
         {
+            await LoadBrokerSession();
+
             // Step 1: Get JWT token (either from refresh token or login)
             if (string.IsNullOrEmpty(_jwtToken))
             {
@@ -201,21 +203,16 @@ public class AngelOneService : IBrokerService
                     {
                         _jwtToken = jwtElement.GetString();
                         System.Console.WriteLine($"JWT Token obtained (length: {_jwtToken?.Length ?? 0})");
-                        if (!string.IsNullOrEmpty(_jwtToken))
-                        {
-                            _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
-                        }
-                        System.Console.WriteLine($"JWT Token cached with key: {JwtTokenCacheKey}");
                     }
 
                     if (dataElement.TryGetProperty("refreshToken", out var refreshElement))
                     {
                         _refreshToken = refreshElement.GetString();
-                    if (!string.IsNullOrEmpty(_refreshToken))
-                    {
-                        _cacheService.SetValue(RefreshTokenCacheKey, _refreshToken);
-                    }
-                    System.Console.WriteLine($"Refresh Token cached with key: {RefreshTokenCacheKey}");
+                        _feedToken = dataElement.TryGetProperty("feedToken", out var feedElement)
+                            ? feedElement.GetString()
+                            : _feedToken;
+
+                        await SaveBrokerSession(dataElement.GetRawText());
 
                         // Log token expiry information if available
                         if (dataElement.TryGetProperty("expiresIn", out var expiryElement))
@@ -311,10 +308,10 @@ public class AngelOneService : IBrokerService
                         _jwtToken = jwtElement.GetString();
                         if (!string.IsNullOrEmpty(_jwtToken))
                         {
-                            _cacheService.SetValue(JwtTokenCacheKey, _jwtToken);
+                            await SaveBrokerSession(dataElement.GetRawText());
                         }
                         System.Console.WriteLine("✅ JWT token refreshed successfully (no TOTP needed)");
-                        System.Console.WriteLine($"JWT Token cached with key: {JwtTokenCacheKey}");
+                        System.Console.WriteLine("JWT token saved to broker session store.");
                         return true;
                     }
                     else
@@ -826,6 +823,8 @@ public class AngelOneService : IBrokerService
 
     private async Task<bool> EnsureJwtToken()
     {
+        await LoadBrokerSession();
+
         if (!string.IsNullOrEmpty(_jwtToken))
         {
             return true;
@@ -837,6 +836,42 @@ public class AngelOneService : IBrokerService
         }
 
         return await GenerateToken();
+    }
+
+    private async Task LoadBrokerSession()
+    {
+        if (!string.IsNullOrEmpty(_jwtToken) || !string.IsNullOrEmpty(_refreshToken))
+        {
+            return;
+        }
+
+        var session = await _brokerSessionStore.GetAsync(BrokerName);
+        if (session == null)
+        {
+            return;
+        }
+
+        _jwtToken = session.AccessToken;
+        _refreshToken = session.RefreshToken;
+        _feedToken = session.FeedToken;
+    }
+
+    private async Task SaveBrokerSession(string? rawDataJson = null)
+    {
+        if (string.IsNullOrWhiteSpace(_jwtToken) || string.IsNullOrWhiteSpace(_refreshToken))
+        {
+            return;
+        }
+
+        await _brokerSessionStore.SaveAsync(new BrokerSession
+        {
+            BrokerName = BrokerName,
+            AccessToken = _jwtToken,
+            RefreshToken = _refreshToken,
+            FeedToken = _feedToken,
+            RawDataJson = rawDataJson,
+            CreatedAtUtc = DateTime.UtcNow
+        });
     }
 
     private async Task<HoldingsResponse> GetHoldingStocks()
