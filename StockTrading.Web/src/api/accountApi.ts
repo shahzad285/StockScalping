@@ -29,6 +29,14 @@ export type LoginRequest = RequestLoginOtpRequest & {
   googleIdToken?: string;
 };
 
+export type SmartApiLoginRequest = {
+  totp?: string;
+};
+
+export type SmartApiLoginResponse = {
+  message: string;
+};
+
 export type AccountProfile = {
   clientCode: string;
   name: string;
@@ -55,4 +63,11 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 
 export async function getProfile(): Promise<{ profile: AccountProfile }> {
   return apiRequest<{ profile: AccountProfile }>("/Account/profile");
+}
+
+export async function smartApiLogin(request: SmartApiLoginRequest): Promise<SmartApiLoginResponse> {
+  return apiRequest<SmartApiLoginResponse>("/Account/smartapi/login", {
+    method: "POST",
+    body: JSON.stringify(request)
+  });
 }

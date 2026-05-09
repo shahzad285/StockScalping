@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, setToken } from "./auth/authStorage";
-import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp } from "./api/accountApi";
+import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartApiLogin } from "./api/accountApi";
 import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
 
@@ -22,6 +22,9 @@ function App() {
   const [otp, setOtp] = useState("");
   const [otpExpiresAtUtc, setOtpExpiresAtUtc] = useState<string | null>(null);
   const [isOtpRequested, setIsOtpRequested] = useState(false);
+  const [smartApiTotp, setSmartApiTotp] = useState("");
+  const [isBrokerConnecting, setIsBrokerConnecting] = useState(false);
+  const [isBrokerConnected, setIsBrokerConnected] = useState(false);
   const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [holdings, setHoldings] = useState<HoldingStock[]>([]);
   const [prices, setPrices] = useState<StockPrice[]>([]);
@@ -49,14 +52,23 @@ function App() {
     setMessage("");
 
     try {
-      const [profileResult, holdingsResult, pricesResult, ordersResult] = await Promise.all([
-        getProfile(),
+      const profileResult = await getProfile();
+      setProfile(profileResult.profile);
+      setIsBrokerConnected(true);
+    } catch (error) {
+      setProfile(null);
+      setIsBrokerConnected(false);
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Broker session unavailable.");
+    }
+
+    try {
+      const [holdingsResult, pricesResult, ordersResult] = await Promise.all([
         getHoldings(),
         getPrices(),
         getOrders()
       ]);
 
-      setProfile(profileResult.profile);
       setHoldings(holdingsResult.stocks);
       setTotalProfitLoss(holdingsResult.totalProfitLoss);
       setPrices(pricesResult.prices);
@@ -66,6 +78,27 @@ function App() {
       setMessage(error instanceof Error ? error.message : "Unable to load dashboard.");
     } finally {
       setIsBusy(false);
+    }
+  }
+
+  async function handleSmartApiLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBrokerConnecting(true);
+    setMessage("");
+
+    try {
+      const result = await smartApiLogin({ totp: smartApiTotp.trim() || undefined });
+      setSmartApiTotp("");
+      setIsBrokerConnected(true);
+      setMessageType("success");
+      setMessage(result.message);
+      await loadDashboard();
+    } catch (error) {
+      setIsBrokerConnected(false);
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Broker login failed.");
+    } finally {
+      setIsBrokerConnecting(false);
     }
   }
 
@@ -129,6 +162,7 @@ function App() {
     clearToken();
     setCurrentToken(null);
     setProfile(null);
+    setIsBrokerConnected(false);
     setHoldings([]);
     setPrices([]);
     setOrders([]);
@@ -259,6 +293,40 @@ function App() {
       </header>
 
       {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
+
+      <section className="broker-panel">
+        <div className="broker-status">
+          <div>
+            <span>Broker</span>
+            <strong>{profile?.broker || "Angel One"}</strong>
+          </div>
+          <div>
+            <span>Session</span>
+            <strong className={isBrokerConnected ? "positive" : "negative"}>
+              {isBrokerConnected ? "Connected" : "Not connected"}
+            </strong>
+          </div>
+          <div>
+            <span>Scope</span>
+            <strong>Global</strong>
+          </div>
+        </div>
+
+        <form className="broker-login" onSubmit={handleSmartApiLogin}>
+          <label htmlFor="smartApiTotp">SmartAPI TOTP</label>
+          <input
+            id="smartApiTotp"
+            inputMode="numeric"
+            maxLength={6}
+            value={smartApiTotp}
+            onChange={(event) => setSmartApiTotp(event.target.value)}
+            placeholder="Enter TOTP"
+          />
+          <button type="submit" disabled={isBrokerConnecting || isBusy}>
+            {isBrokerConnecting ? "Connecting..." : isBrokerConnected ? "Refresh session" : "Connect broker"}
+          </button>
+        </form>
+      </section>
 
       <section className="summary-grid">
         <article>
