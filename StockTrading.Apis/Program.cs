@@ -49,6 +49,8 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddStockTradingData(builder.Configuration);
 builder.Services.Configure<OtpSettings>(builder.Configuration.GetSection("Auth:Otp"));
+builder.Services.Configure<EmailOtpSettings>(builder.Configuration.GetSection("Auth:Otp:Email"));
+builder.Services.Configure<BrevoSettings>(builder.Configuration.GetSection("Auth:Otp:Email:Brevo"));
 builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("Auth:Otp:Email:SendGrid"));
 builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Auth:Otp:Mobile:Twilio"));
 
@@ -94,9 +96,24 @@ builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>(
 builder.Services.AddScoped<ITrackedStockRepository, TrackedStockRepository>();
 builder.Services.AddScoped<IBrokerSessionRepository, BrokerSessionRepository>();
 builder.Services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
-builder.Services.AddHttpClient<IEmailOtpSender, SendGridEmailOtpSender>(client =>
+builder.Services.AddHttpClient<SendGridEmailOtpSender>(client =>
 {
     client.BaseAddress = new Uri("https://api.sendgrid.com/");
+});
+builder.Services.AddHttpClient<BrevoEmailOtpSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.brevo.com/");
+});
+builder.Services.AddScoped<IEmailOtpSender>(serviceProvider =>
+{
+    var config = serviceProvider.GetRequiredService<IConfiguration>();
+    var activeProvider = config["Auth:Otp:Email:Provider"] ?? "Brevo";
+
+    return activeProvider.Equals("Brevo", StringComparison.OrdinalIgnoreCase)
+        ? serviceProvider.GetRequiredService<BrevoEmailOtpSender>()
+        : activeProvider.Equals("SendGrid", StringComparison.OrdinalIgnoreCase)
+            ? serviceProvider.GetRequiredService<SendGridEmailOtpSender>()
+            : throw new InvalidOperationException($"Unsupported email OTP provider '{activeProvider}'.");
 });
 builder.Services.AddHttpClient<IMobileOtpSender, TwilioMobileOtpSender>(client =>
 {
