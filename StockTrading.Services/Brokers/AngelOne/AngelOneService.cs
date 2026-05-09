@@ -10,7 +10,7 @@ using StockTrading.Models;
 
 namespace StockTrading.Services;
 
-public class AngelOneService : IAngelOneService
+public class AngelOneService : IBrokerService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _config;
@@ -74,7 +74,7 @@ public class AngelOneService : IAngelOneService
         }
     }
 
-    public async Task<bool> Login(string? totp = null)
+    private async Task<bool> Login(string? totp = null)
     {
         try
         {
@@ -346,7 +346,7 @@ public class AngelOneService : IAngelOneService
         }
     }
 
-    public async Task<decimal> GetCurrentPrice(string symbol)
+    private async Task<decimal> GetCurrentPrice(string symbol)
     {
         var prices = await GetCurrentPrices(new[]
         {
@@ -360,7 +360,7 @@ public class AngelOneService : IAngelOneService
         return prices.FirstOrDefault()?.LastTradedPrice ?? 0m;
     }
 
-    public async Task<AccountProfile?> GetProfile()
+    private async Task<AccountProfile?> GetProfile()
     {
         try
         {
@@ -408,13 +408,13 @@ public class AngelOneService : IAngelOneService
         }
     }
 
-    public async Task<List<StockPrice>> GetConfiguredStockPrices()
+    private async Task<List<StockPrice>> GetConfiguredStockPrices()
     {
         var stocks = _config.GetSection("Trading:Stocks").Get<List<TrackedStock>>() ?? new List<TrackedStock>();
         return await GetCurrentPrices(stocks);
     }
 
-    public async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<TrackedStock> stocks)
+    private async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<TrackedStock> stocks)
     {
         var stockList = stocks
             .Where(stock => !string.IsNullOrWhiteSpace(stock.Symbol) ||
@@ -473,7 +473,7 @@ public class AngelOneService : IAngelOneService
         return prices;
     }
 
-    public async Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price)
+    private async Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price)
     {
         // Placeholder implementation
         return false;
@@ -839,7 +839,7 @@ public class AngelOneService : IAngelOneService
         return await GenerateToken();
     }
 
-    public async Task<HoldingsResponse> GetHoldingStocks()
+    private async Task<HoldingsResponse> GetHoldingStocks()
     {
         try
         {
@@ -926,7 +926,7 @@ public class AngelOneService : IAngelOneService
         }
     }
 
-    public async Task<List<OrderDetails>> GetOrders()
+    private async Task<List<OrderDetails>> GetOrders()
     {
         try
         {
@@ -993,5 +993,51 @@ public class AngelOneService : IAngelOneService
             System.Console.WriteLine($"Error fetching orders: {ex.Message}");
             return new List<OrderDetails>();
         }
+    }
+
+    public Task<bool> LoginAsync(string? otp = null)
+    {
+        return Login(otp);
+    }
+
+    public Task<AccountProfile?> GetProfileAsync()
+    {
+        return GetProfile();
+    }
+
+    public Task<HoldingsResponse> GetHoldingsAsync()
+    {
+        return GetHoldingStocks();
+    }
+
+    public Task<List<StockPrice>> GetPricesAsync(IEnumerable<TrackedStock> stocks)
+    {
+        return GetCurrentPrices(stocks);
+    }
+
+    public Task<List<OrderDetails>> GetOrdersAsync()
+    {
+        return GetOrders();
+    }
+
+    public async Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request)
+    {
+        var isPlaced = await PlaceOrder(
+            request.Symbol,
+            request.Quantity,
+            request.TransactionType,
+            request.Price);
+
+        return isPlaced
+            ? new PlaceOrderResult(true, Message: "Order placed.")
+            : new PlaceOrderResult(false, Message: "Order placement is not implemented for Angel One yet.");
+    }
+
+    public Task<CancelOrderResult> CancelOrderAsync(string brokerOrderId)
+    {
+        return Task.FromResult(new CancelOrderResult(
+            false,
+            brokerOrderId,
+            "Order cancellation is not implemented for Angel One yet."));
     }
 }

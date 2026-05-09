@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using StockTrading.Common.DTOs;
 using StockTrading.Models;
 using StockTrading.IServices;
 using System.Collections.Generic;
@@ -38,21 +39,40 @@ public class ScalpingService : BackgroundService, IScalpingService
                     continue;
                 }
 
-                var currentPrice = await _brokerService.GetCurrentPrice(stock.Symbol);
+                var prices = await _brokerService.GetPricesAsync(new[] { stock });
+                var currentPrice = prices.FirstOrDefault()?.LastTradedPrice ?? 0m;
                 
                 if (currentPrice <= stock.PurchaseRate.Value)
                 {
                     _logger.LogInformation($"Buy condition met for {stock.Symbol} at {currentPrice}");
-                    await _brokerService.PlaceOrder(stock.Symbol, 1, "BUY", currentPrice);
+                    await _brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "BUY", currentPrice));
                 }
                 else if (currentPrice >= stock.SalesRate.Value)
                 {
                     _logger.LogInformation($"Sell condition met for {stock.Symbol} at {currentPrice}");
-                    await _brokerService.PlaceOrder(stock.Symbol, 1, "SELL", currentPrice);
+                    await _brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "SELL", currentPrice));
                 }
             }
             
             await Task.Delay(5000, stoppingToken); // Check every 5 seconds
         }
+    }
+
+    private static PlaceOrderRequest CreatePlaceOrderRequest(
+        TrackedStock stock,
+        string transactionType,
+        decimal price)
+    {
+        return new PlaceOrderRequest(
+            stock.Symbol,
+            string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange,
+            transactionType,
+            "MARKET",
+            "INTRADAY",
+            "DAY",
+            1,
+            price,
+            SymbolToken: stock.SymbolToken,
+            TradingSymbol: stock.TradingSymbol);
     }
 }

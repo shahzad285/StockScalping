@@ -102,10 +102,10 @@ builder.Services.AddHttpClient<IMobileOtpSender, TwilioMobileOtpSender>(client =
     client.BaseAddress = new Uri("https://api.twilio.com/");
 });
 builder.Services.AddScoped<IAccountService, AccountService>();
+builder.Services.AddScoped<IStockService, StockService>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IScalpingQueryService, ScalpingQueryService>();
 builder.Services.AddHttpClient<AngelOneService>();
-builder.Services.AddTransient<IAngelOneService>(serviceProvider =>
-    serviceProvider.GetRequiredService<AngelOneService>());
 builder.Services.AddTransient<IBrokerService>(serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<IConfiguration>();

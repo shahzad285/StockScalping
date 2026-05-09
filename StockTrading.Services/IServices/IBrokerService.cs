@@ -1,21 +1,15 @@
+using StockTrading.Common.DTOs;
+using StockTrading.Models;
+
 namespace StockTrading.IServices;
 
 public interface IBrokerService
 {
-    /// <summary>
-    /// Gets the current price of a stock.
-    /// </summary>
-    /// <param name="symbol">Stock symbol</param>
-    /// <returns>Current stock price</returns>
-    Task<decimal> GetCurrentPrice(string symbol);
-
-    /// <summary>
-    /// Places an order for a stock.
-    /// </summary>
-    /// <param name="symbol">Stock symbol</param>
-    /// <param name="quantity">Order quantity</param>
-    /// <param name="orderType">BUY or SELL</param>
-    /// <param name="price">Order price</param>
-    /// <returns>True if order placement is successful</returns>
-    Task<bool> PlaceOrder(string symbol, int quantity, string orderType, decimal price);
+    Task<bool> LoginAsync(string? otp = null);
+    Task<AccountProfile?> GetProfileAsync();
+    Task<HoldingsResponse> GetHoldingsAsync();
+    Task<List<StockPrice>> GetPricesAsync(IEnumerable<TrackedStock> stocks);
+    Task<List<OrderDetails>> GetOrdersAsync();
+    Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request);
+    Task<CancelOrderResult> CancelOrderAsync(string brokerOrderId);
 }

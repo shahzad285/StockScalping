@@ -7,11 +7,11 @@ namespace StockTrading.Controllers;
 [Route("[controller]")]
 public class StockController : ControllerBase
 {
-    private readonly IAngelOneService _angelOneService;
+    private readonly IStockService _stockService;
 
-    public StockController(IAngelOneService angelOneService)
+    public StockController(IStockService stockService)
     {
-        _angelOneService = angelOneService;
+        _stockService = stockService;
     }
 
     [HttpGet("holdings")]
@@ -19,7 +19,7 @@ public class StockController : ControllerBase
     {
         try
         {
-            var holdings = await _angelOneService.GetHoldingStocks();
+            var holdings = await _stockService.GetHoldingsAsync(HttpContext.RequestAborted);
             return Ok(holdings);
         }
         catch (Exception ex)
@@ -33,7 +33,7 @@ public class StockController : ControllerBase
     {
         try
         {
-            var prices = await _angelOneService.GetConfiguredStockPrices();
+            var prices = await _stockService.GetConfiguredPricesAsync(HttpContext.RequestAborted);
             return Ok(new { prices });
         }
         catch (Exception ex)

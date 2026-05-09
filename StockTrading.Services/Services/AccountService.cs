@@ -13,7 +13,7 @@ namespace StockTrading.Services;
 
 public sealed class AccountService(
     IConfiguration configuration,
-    IAngelOneService angelOneService,
+    IBrokerService brokerService,
     IAppJwtService jwtService,
     IApplicationUserRepository userRepository,
     IApplicationRoleRepository roleRepository,
@@ -180,7 +180,7 @@ public sealed class AccountService(
         SmartApiLoginRequest request,
         CancellationToken cancellationToken = default)
     {
-        var isConnected = await angelOneService.Login(request.Totp);
+        var isConnected = await brokerService.LoginAsync(request.Totp);
         return isConnected
             ? AccountServiceResult<object>.Ok(new { message = "Broker login successful" })
             : AccountServiceResult<object>.Unauthorized("Broker login failed");
@@ -192,7 +192,7 @@ public sealed class AccountService(
     {
         try
         {
-            var profile = await angelOneService.GetProfile();
+            var profile = await brokerService.GetProfileAsync();
             if (profile != null)
             {
                 return AccountServiceResult<AccountProfile>.Ok(profile);
