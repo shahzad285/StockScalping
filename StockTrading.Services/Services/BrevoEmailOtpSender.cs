@@ -43,9 +43,17 @@ public sealed class BrevoEmailOtpSender(
         request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        return response.IsSuccessStatusCode
-            ? OtpDeliveryResult.Success()
-            : OtpDeliveryResult.Failed($"Brevo failed with status code {(int)response.StatusCode}.");
+        if (response.IsSuccessStatusCode)
+        {
+            return OtpDeliveryResult.Success();
+        }
+
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        var errorMessage = string.IsNullOrWhiteSpace(responseBody)
+            ? $"Brevo failed with status code {(int)response.StatusCode}."
+            : $"Brevo failed with status code {(int)response.StatusCode}: {responseBody}";
+
+        return OtpDeliveryResult.Failed(errorMessage);
     }
 
     private static string BuildMessage(string otp, DateTime expiresAtUtc)

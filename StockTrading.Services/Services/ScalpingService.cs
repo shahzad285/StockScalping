@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StockTrading.Common.DTOs;
@@ -13,15 +14,15 @@ namespace StockTrading.Services;
 public class ScalpingService : BackgroundService, IScalpingService
 {
     private readonly ILogger<ScalpingService> _logger;
-    private readonly IBrokerService _brokerService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly List<TrackedStock> _stocks;
 
     public ScalpingService(ILogger<ScalpingService> logger, 
-                          IBrokerService brokerService,
+                          IServiceScopeFactory scopeFactory,
                           IConfiguration config)
     {
         _logger = logger;
-        _brokerService = brokerService;
+        _scopeFactory = scopeFactory;
         
         // Load configured stocks from appsettings.json
         _stocks = config.GetSection("Trading:Stocks").Get<List<TrackedStock>>() 
@@ -32,6 +33,9 @@ public class ScalpingService : BackgroundService, IScalpingService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            using var scope = _scopeFactory.CreateScope();
+            var brokerService = scope.ServiceProvider.GetRequiredService<IBrokerService>();
+
             foreach (var stock in _stocks)
             {
                 if (!stock.PurchaseRate.HasValue || !stock.SalesRate.HasValue)
@@ -39,18 +43,18 @@ public class ScalpingService : BackgroundService, IScalpingService
                     continue;
                 }
 
-                var prices = await _brokerService.GetPricesAsync(new[] { stock });
+                var prices = await brokerService.GetPricesAsync(new[] { stock });
                 var currentPrice = prices.FirstOrDefault()?.LastTradedPrice ?? 0m;
                 
                 if (currentPrice <= stock.PurchaseRate.Value)
                 {
                     _logger.LogInformation($"Buy condition met for {stock.Symbol} at {currentPrice}");
-                    await _brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "BUY", currentPrice));
+                    await brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "BUY", currentPrice));
                 }
                 else if (currentPrice >= stock.SalesRate.Value)
                 {
                     _logger.LogInformation($"Sell condition met for {stock.Symbol} at {currentPrice}");
-                    await _brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "SELL", currentPrice));
+                    await brokerService.PlaceOrderAsync(CreatePlaceOrderRequest(stock, "SELL", currentPrice));
                 }
             }
             

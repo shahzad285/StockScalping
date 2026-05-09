@@ -179,10 +179,10 @@ function App() {
   }
 
   useEffect(() => {
-    if (isLoggedIn) {
+    if (token) {
       void loadDashboard();
     }
-  }, [isLoggedIn]);
+  }, [token]);
 
   if (!isLoggedIn) {
     return (

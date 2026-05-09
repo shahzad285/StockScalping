@@ -43,18 +43,20 @@ public sealed class BrokerSessionRepository(IDbConnectionFactory connectionFacto
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(
             """
-            update broker_sessions
-            set access_token_encrypted = @AccessTokenEncrypted,
-                refresh_token_encrypted = @RefreshTokenEncrypted,
-                feed_token_encrypted = @FeedTokenEncrypted,
-                access_token_expires_at_utc = @AccessTokenExpiresAtUtc,
-                refresh_token_expires_at_utc = @RefreshTokenExpiresAtUtc,
-                raw_data_json = @RawDataJson,
-                is_active = true,
-                updated_at_utc = now()
-            where broker_name = @BrokerName
-              and ((@UserId is null and user_id is null) or user_id = @UserId);
-
+            with updated as (
+                update broker_sessions
+                set access_token_encrypted = @AccessTokenEncrypted,
+                    refresh_token_encrypted = @RefreshTokenEncrypted,
+                    feed_token_encrypted = @FeedTokenEncrypted,
+                    access_token_expires_at_utc = @AccessTokenExpiresAtUtc,
+                    refresh_token_expires_at_utc = @RefreshTokenExpiresAtUtc,
+                    raw_data_json = @RawDataJson,
+                    is_active = true,
+                    updated_at_utc = now()
+                where broker_name = @BrokerName
+                  and ((@UserId is null and user_id is null) or user_id = @UserId)
+                returning id
+            )
             insert into broker_sessions (
                 broker_name,
                 user_id,
@@ -67,7 +69,7 @@ public sealed class BrokerSessionRepository(IDbConnectionFactory connectionFacto
                 is_active,
                 created_at_utc
             )
-            values (
+            select
                 @BrokerName,
                 @UserId,
                 @AccessTokenEncrypted,
@@ -78,13 +80,13 @@ public sealed class BrokerSessionRepository(IDbConnectionFactory connectionFacto
                 @RawDataJson,
                 true,
                 @CreatedAtUtc
-            )
-            where not exists (
-                select 1
-                from broker_sessions
-                where broker_name = @BrokerName
-                  and ((@UserId is null and user_id is null) or user_id = @UserId)
-            )
+            where not exists (select 1 from updated)
+              and not exists (
+                  select 1
+                  from broker_sessions
+                  where broker_name = @BrokerName
+                    and ((@UserId is null and user_id is null) or user_id = @UserId)
+              )
             """,
             session);
     }

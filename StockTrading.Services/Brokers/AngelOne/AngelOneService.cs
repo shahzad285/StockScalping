@@ -49,10 +49,7 @@ public class AngelOneService : IBrokerService
         _clientPublicIP = _config["AngelOne:ClientPublicIP"] ?? "";
         _macAddress = _config["AngelOne:MACAddress"] ?? "";
 
-        System.Console.WriteLine($"AngelOne Service initialized with:");
-        System.Console.WriteLine($"  LocalIP: {_clientLocalIP}");
-        System.Console.WriteLine($"  PublicIP: {_clientPublicIP}");
-        System.Console.WriteLine($"  MAC: {_macAddress}");
+        System.Console.WriteLine("AngelOne Service initialized.");
     }
 
     private void SetDefaultHeaders(string? token = null)
@@ -80,25 +77,29 @@ public class AngelOneService : IBrokerService
         {
             await LoadBrokerSession();
 
-            // Step 1: Get JWT token (either from refresh token or login)
+            // Step 1: Get JWT token from refresh token, or login with MPIN + TOTP.
             if (string.IsNullOrEmpty(_jwtToken))
             {
                 bool tokenSuccess;
 
-                // If we have refresh token, use it (M2M mode - no manual login needed)
                 if (!string.IsNullOrEmpty(_refreshToken))
                 {
                     tokenSuccess = await GenerateToken();
+                    if (!tokenSuccess && !string.IsNullOrEmpty(totp))
+                    {
+                        System.Console.WriteLine("Refresh token failed. Trying MPIN + TOTP login.");
+                        tokenSuccess = await LoginWithTotp(totp);
+                    }
                 }
                 else
                 {
-                    // Otherwise, login manually with provided TOTP
                     if (string.IsNullOrEmpty(totp))
                     {
-                        System.Console.WriteLine("TOTP required for first-time login. Pass ?totp=<code> in the URL");
+                        System.Console.WriteLine("TOTP required for first-time login.");
                         System.Console.WriteLine("Login failed");
                         return false;
                     }
+
                     tokenSuccess = await LoginWithTotp(totp);
                 }
 
@@ -115,16 +116,39 @@ public class AngelOneService : IBrokerService
             var response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
 
             var content = await response.Content.ReadAsStringAsync();
-            System.Console.WriteLine($"Response Status: {response.StatusCode}");
-            System.Console.WriteLine($"Response Body: {content}");
+            System.Console.WriteLine($"Profile Response Status: {response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
             {
+                if (!string.IsNullOrEmpty(totp))
+                {
+                    System.Console.WriteLine("Saved JWT failed. Trying MPIN + TOTP login.");
+                    if (await LoginWithTotp(totp))
+                    {
+                        SetDefaultHeaders(_jwtToken);
+                        response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
+                        content = await response.Content.ReadAsStringAsync();
+                        System.Console.WriteLine($"Retry Profile Response Status: {response.StatusCode}");
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            using var retryJsonDoc = JsonDocument.Parse(content);
+                            var retryRoot = retryJsonDoc.RootElement;
+                            if (retryRoot.TryGetProperty("status", out var retryStatusElement) &&
+                                retryStatusElement.GetBoolean())
+                            {
+                                System.Console.WriteLine("Login successful");
+                                return true;
+                            }
+                        }
+                    }
+                }
+
                 System.Console.WriteLine("Login failed");
                 return false;
             }
 
-            var jsonDoc = JsonDocument.Parse(content);
+            using var jsonDoc = JsonDocument.Parse(content);
             var root = jsonDoc.RootElement;
 
             // Check if API response indicates success
@@ -137,6 +161,30 @@ public class AngelOneService : IBrokerService
                 }
                 else
                 {
+                    if (!string.IsNullOrEmpty(totp))
+                    {
+                        System.Console.WriteLine("Saved JWT profile check failed. Trying MPIN + TOTP login.");
+                        if (await LoginWithTotp(totp))
+                        {
+                            SetDefaultHeaders(_jwtToken);
+                            response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
+                            content = await response.Content.ReadAsStringAsync();
+                            System.Console.WriteLine($"Retry Profile Response Status: {response.StatusCode}");
+
+                            if (response.IsSuccessStatusCode)
+                            {
+                                using var retryJsonDoc = JsonDocument.Parse(content);
+                                var retryRoot = retryJsonDoc.RootElement;
+                                if (retryRoot.TryGetProperty("status", out var retryStatusElement) &&
+                                    retryStatusElement.GetBoolean())
+                                {
+                                    System.Console.WriteLine("Login successful");
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+
                     System.Console.WriteLine("Login failed");
                     return false;
                 }
@@ -165,6 +213,7 @@ public class AngelOneService : IBrokerService
             }
 
             SetDefaultHeaders();
+            System.Console.WriteLine("Sending AngelOne login request.");
 
             var loginRequest = new
             {
@@ -184,7 +233,6 @@ public class AngelOneService : IBrokerService
 
             var responseContent = await response.Content.ReadAsStringAsync();
             System.Console.WriteLine($"Login Response Status: {response.StatusCode}");
-            System.Console.WriteLine($"Login Response Body: {responseContent}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -214,15 +262,45 @@ public class AngelOneService : IBrokerService
 
                         await SaveBrokerSession(dataElement.GetRawText());
 
-                        // Log token expiry information if available
                         if (dataElement.TryGetProperty("expiresIn", out var expiryElement))
                         {
                             System.Console.WriteLine($"Refresh Token TTL: {expiryElement.GetString()} seconds");
                         }
+
                         if (dataElement.TryGetProperty("refreshTokenExpiry", out var refreshExpiry))
                         {
                             System.Console.WriteLine($"Refresh Token Expiry: {refreshExpiry.GetString()}");
                         }
+
+                        System.Console.WriteLine("M2M mode enabled - future requests will use refresh token automatically");
+                    }
+                    else
+                    {
+                        System.Console.WriteLine("refreshToken property not found in login response data");
+                    }
+
+                    System.Console.WriteLine("Login successful, JWT token obtained");
+                    return true;
+                }
+
+                System.Console.WriteLine("data property not found in login response");
+            }
+            else
+            {
+                System.Console.WriteLine("status property is false or not found in login response");
+            }
+
+            return false;
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"Login Error: {ex.Message}");
+            System.Console.WriteLine("Login failed");
+            return false;
+        }
+    }
+
+/*
 
                         System.Console.WriteLine("✅ M2M mode enabled - future requests will use refresh token automatically");
                     }
@@ -254,6 +332,7 @@ public class AngelOneService : IBrokerService
         }
     }
 
+*/
     private async Task<bool> GenerateToken()
     {
         try
@@ -272,10 +351,8 @@ public class AngelOneService : IBrokerService
                 refreshToken = _refreshToken
             };
 
-            var requestBody = System.Text.Json.JsonSerializer.Serialize(tokenRequest);
-            System.Console.WriteLine($"Request body: {requestBody}");
             var content = new StringContent(
-                requestBody,
+                System.Text.Json.JsonSerializer.Serialize(tokenRequest),
                 System.Text.Encoding.UTF8,
                 "application/json");
 
@@ -287,7 +364,6 @@ public class AngelOneService : IBrokerService
 
             var responseContent = await response.Content.ReadAsStringAsync();
             System.Console.WriteLine($"Generate Token Response Status: {response.StatusCode}");
-            System.Console.WriteLine($"Generate Token Response Body: {responseContent}");
 
             if (!response.IsSuccessStatusCode)
             {
@@ -374,7 +450,6 @@ public class AngelOneService : IBrokerService
             if (!response.IsSuccessStatusCode)
             {
                 System.Console.WriteLine($"Failed to fetch profile: {response.StatusCode}");
-                System.Console.WriteLine($"Profile Response Body: {content}");
                 return null;
             }
 

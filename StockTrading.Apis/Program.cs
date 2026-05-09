@@ -126,7 +126,7 @@ builder.Services.AddScoped<IStringEncryptionService, AesStringEncryptionService>
 builder.Services.AddScoped<IBrokerSessionStore, BrokerSessionStore>();
 builder.Services.AddScoped<IScalpingQueryService, ScalpingQueryService>();
 builder.Services.AddHttpClient<AngelOneService>();
-builder.Services.AddTransient<IBrokerService>(serviceProvider =>
+builder.Services.AddScoped<IBrokerService>(serviceProvider =>
 {
     var config = serviceProvider.GetRequiredService<IConfiguration>();
     var activeBroker = config["Broker:Active"] ?? "AngelOne";
