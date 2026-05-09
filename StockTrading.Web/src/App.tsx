@@ -3,8 +3,28 @@ import { clearToken, getToken, setToken } from "./auth/authStorage";
 import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartApiLogin } from "./api/accountApi";
 import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
+import {
+  createWatchlist,
+  deleteStockFromWatchlist,
+  deleteWatchlist,
+  getWatchlists,
+  getWatchlistStocks,
+  saveStockToWatchlist,
+  Watchlist,
+  WatchlistStock
+} from "./api/watchlistApi";
 
 type View = "holdings" | "prices" | "orders";
+type Page = "dashboard" | "watchlists";
+
+const emptyWatchlistStock: WatchlistStock = {
+  symbol: "",
+  exchange: "NSE",
+  symbolToken: "",
+  tradingSymbol: "",
+  purchaseRate: null,
+  salesRate: null
+};
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat("en-IN", {
@@ -29,6 +49,12 @@ function App() {
   const [holdings, setHoldings] = useState<HoldingStock[]>([]);
   const [prices, setPrices] = useState<StockPrice[]>([]);
   const [orders, setOrders] = useState<OrderDetails[]>([]);
+  const [page, setPage] = useState<Page>("dashboard");
+  const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
+  const [selectedWatchlistStocks, setSelectedWatchlistStocks] = useState<WatchlistStock[]>([]);
+  const [newWatchlistName, setNewWatchlistName] = useState("");
+  const [selectedWatchlistForm, setSelectedWatchlistForm] = useState<WatchlistStock>(emptyWatchlistStock);
   const [totalProfitLoss, setTotalProfitLoss] = useState(0);
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
@@ -99,6 +125,135 @@ function App() {
       setMessage(error instanceof Error ? error.message : "Broker login failed.");
     } finally {
       setIsBrokerConnecting(false);
+    }
+  }
+
+  async function loadWatchlists(nextSelectedId?: number) {
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await getWatchlists();
+      setWatchlists(result.watchlists);
+
+      const selectedId = nextSelectedId ?? selectedWatchlistId ?? result.watchlists[0]?.id ?? null;
+      setSelectedWatchlistId(selectedId);
+
+      if (selectedId) {
+        const stocksResult = await getWatchlistStocks(selectedId);
+        setSelectedWatchlistStocks(stocksResult.stocks);
+      } else {
+        setSelectedWatchlistStocks([]);
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load watchlists.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleCreateWatchlist(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await createWatchlist(newWatchlistName.trim());
+      setNewWatchlistName("");
+      setMessageType("success");
+      setMessage("Watchlist created.");
+      await loadWatchlists(result.watchlist.id);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to create watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleSelectWatchlist(id: number) {
+    setSelectedWatchlistId(id);
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await getWatchlistStocks(id);
+      setSelectedWatchlistStocks(result.stocks);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load watchlist stocks.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDeleteWatchlist(id: number) {
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await deleteWatchlist(id);
+      setMessageType("success");
+      setMessage("Watchlist removed.");
+      await loadWatchlists(selectedWatchlistId === id ? undefined : selectedWatchlistId ?? undefined);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to remove watchlist.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleSelectedWatchlistSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedWatchlistId) {
+      setMessageType("error");
+      setMessage("Create or select a watchlist first.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await saveStockToWatchlist(selectedWatchlistId, {
+        ...selectedWatchlistForm,
+        purchaseRate: selectedWatchlistForm.purchaseRate ?? null,
+        salesRate: selectedWatchlistForm.salesRate ?? null
+      });
+      const result = await getWatchlistStocks(selectedWatchlistId);
+      setSelectedWatchlistStocks(result.stocks);
+      setSelectedWatchlistForm(emptyWatchlistStock);
+      setMessageType("success");
+      setMessage("Watchlist stock saved.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to save watchlist stock.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDeleteSelectedWatchlistStock(stock: WatchlistStock) {
+    if (!selectedWatchlistId || !stock.watchlistItemId) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await deleteStockFromWatchlist(selectedWatchlistId, stock.watchlistItemId);
+      setSelectedWatchlistStocks((current) => current.filter((item) => item.watchlistItemId !== stock.watchlistItemId));
+      setMessageType("success");
+      setMessage("Watchlist stock removed.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to remove watchlist stock.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -183,6 +338,12 @@ function App() {
       void loadDashboard();
     }
   }, [token]);
+
+  useEffect(() => {
+    if (token && page === "watchlists") {
+      void loadWatchlists();
+    }
+  }, [token, page]);
 
   if (!isLoggedIn) {
     return (
@@ -283,6 +444,12 @@ function App() {
           <h1>{profile?.name || "Dashboard"}</h1>
         </div>
         <div className="topbar-actions">
+          <button type="button" className={page === "dashboard" ? "" : "secondary"} onClick={() => setPage("dashboard")}>
+            Dashboard
+          </button>
+          <button type="button" className={page === "watchlists" ? "" : "secondary"} onClick={() => setPage("watchlists")}>
+            Watchlists
+          </button>
           <button type="button" onClick={loadDashboard} disabled={isBusy}>
             {isBusy ? "Refreshing..." : "Refresh"}
           </button>
@@ -293,6 +460,156 @@ function App() {
       </header>
 
       {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
+
+      {page === "watchlists" && (
+        <section className="watchlists-page">
+          <div className="watchlists-sidebar">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Watchlists</p>
+                <h2>Lists</h2>
+              </div>
+            </div>
+
+            <form className="watchlist-create-form" onSubmit={handleCreateWatchlist}>
+              <input
+                value={newWatchlistName}
+                onChange={(event) => setNewWatchlistName(event.target.value)}
+                placeholder="New watchlist"
+                required
+              />
+              <button type="submit" disabled={isBusy}>
+                Create
+              </button>
+            </form>
+
+            <div className="watchlist-list">
+              {watchlists.map((watchlist) => (
+                <article className={selectedWatchlistId === watchlist.id ? "active" : ""} key={watchlist.id}>
+                  <button type="button" onClick={() => void handleSelectWatchlist(watchlist.id)}>
+                    {watchlist.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => void handleDeleteWatchlist(watchlist.id)}
+                    disabled={isBusy}
+                  >
+                    Remove
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="watchlist-detail">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Stocks</p>
+                <h2>{watchlists.find((watchlist) => watchlist.id === selectedWatchlistId)?.name || "Select a watchlist"}</h2>
+              </div>
+            </div>
+
+            <form className="stock-plan-form" onSubmit={handleSelectedWatchlistSubmit}>
+              <label>
+                Symbol
+                <input
+                  value={selectedWatchlistForm.symbol}
+                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, symbol: event.target.value }))}
+                  placeholder="RELIANCE"
+                  required
+                />
+              </label>
+              <label>
+                Exchange
+                <input
+                  value={selectedWatchlistForm.exchange}
+                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, exchange: event.target.value }))}
+                  placeholder="NSE"
+                  required
+                />
+              </label>
+              <label>
+                Symbol token
+                <input
+                  value={selectedWatchlistForm.symbolToken}
+                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, symbolToken: event.target.value }))}
+                  placeholder="2885"
+                  required
+                />
+              </label>
+              <label>
+                Trading symbol
+                <input
+                  value={selectedWatchlistForm.tradingSymbol}
+                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, tradingSymbol: event.target.value }))}
+                  placeholder="RELIANCE-EQ"
+                />
+              </label>
+              <label>
+                Buy at
+                <input
+                  type="number"
+                  step="0.05"
+                  value={selectedWatchlistForm.purchaseRate ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      purchaseRate: event.target.value ? Number(event.target.value) : null
+                    }))
+                  }
+                  placeholder="0.00"
+                />
+              </label>
+              <label>
+                Sell at
+                <input
+                  type="number"
+                  step="0.05"
+                  value={selectedWatchlistForm.salesRate ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      salesRate: event.target.value ? Number(event.target.value) : null
+                    }))
+                  }
+                  placeholder="0.00"
+                />
+              </label>
+              <button type="submit" disabled={isBusy || !selectedWatchlistId}>
+                Save stock
+              </button>
+            </form>
+
+            <div className="planned-stocks">
+              {selectedWatchlistStocks.map((stock) => (
+                <article key={stock.watchlistItemId || `${stock.exchange}-${stock.symbolToken}`}>
+                  <div>
+                    <strong>{stock.tradingSymbol || stock.symbol}</strong>
+                    <span>
+                      {stock.exchange} · {stock.symbolToken}
+                    </span>
+                  </div>
+                  <div>
+                    <span>Buy</span>
+                    <strong>{stock.purchaseRate ? formatMoney(stock.purchaseRate) : "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Sell</span>
+                    <strong>{stock.salesRate ? formatMoney(stock.salesRate) : "-"}</strong>
+                  </div>
+                  <button type="button" className="secondary" onClick={() => void handleDeleteSelectedWatchlistStock(stock)} disabled={isBusy}>
+                    Remove
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {page === "dashboard" && (
+        <>
 
       <section className="broker-panel">
         <div className="broker-status">
@@ -327,6 +644,7 @@ function App() {
           </button>
         </form>
       </section>
+
 
       <section className="summary-grid">
         <article>
@@ -440,6 +758,8 @@ function App() {
             </tbody>
           </table>
         </section>
+      )}
+        </>
       )}
     </main>
   );

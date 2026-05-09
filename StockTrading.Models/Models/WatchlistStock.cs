@@ -1,10 +1,10 @@
 namespace StockTrading.Models;
 
-/// <summary>
-/// Stock/instrument configured for tracking or trading.
-/// </summary>
-public class TrackedStock
+public class WatchlistStock
 {
+    public int WatchlistItemId { get; set; }
+    public int WatchlistId { get; set; }
+    public int StockId { get; set; }
     public required string Symbol { get; set; }
     public string Exchange { get; set; } = "NSE";
     public string SymbolToken { get; set; } = "";

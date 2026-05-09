@@ -1,7 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.IO;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using StockTrading.Common.DTOs;
@@ -423,7 +422,7 @@ public class AngelOneService : IBrokerService
     {
         var prices = await GetCurrentPrices(new[]
         {
-            new TrackedStock
+            new WatchlistStock
             {
                 Symbol = symbol,
                 Exchange = "NSE"
@@ -480,13 +479,7 @@ public class AngelOneService : IBrokerService
         }
     }
 
-    private async Task<List<StockPrice>> GetConfiguredStockPrices()
-    {
-        var stocks = _config.GetSection("Trading:Stocks").Get<List<TrackedStock>>() ?? new List<TrackedStock>();
-        return await GetCurrentPrices(stocks);
-    }
-
-    private async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<TrackedStock> stocks)
+    private async Task<List<StockPrice>> GetCurrentPrices(IEnumerable<WatchlistStock> stocks)
     {
         var stockList = stocks
             .Where(stock => !string.IsNullOrWhiteSpace(stock.Symbol) ||
@@ -559,7 +552,7 @@ public class AngelOneService : IBrokerService
         public string SymbolToken { get; set; } = "";
     }
 
-    private async Task<ScripInstrument?> ResolveInstrument(TrackedStock stock)
+    private async Task<ScripInstrument?> ResolveInstrument(WatchlistStock stock)
     {
         var exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange.Trim().ToUpperInvariant();
         var symbol = string.IsNullOrWhiteSpace(stock.Symbol) ? stock.TradingSymbol : stock.Symbol;
@@ -998,7 +991,7 @@ public class AngelOneService : IBrokerService
                 }
             }
 
-            var holdingPrices = await GetCurrentPrices(holdings.Select(holding => new TrackedStock
+            var holdingPrices = await GetCurrentPrices(holdings.Select(holding => new WatchlistStock
             {
                 Symbol = string.IsNullOrWhiteSpace(holding.TradingSymbol) ? holding.StockName : holding.TradingSymbol,
                 TradingSymbol = holding.TradingSymbol,
@@ -1120,7 +1113,7 @@ public class AngelOneService : IBrokerService
         return GetHoldingStocks();
     }
 
-    public Task<List<StockPrice>> GetPricesAsync(IEnumerable<TrackedStock> stocks)
+    public Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks)
     {
         return GetCurrentPrices(stocks);
     }

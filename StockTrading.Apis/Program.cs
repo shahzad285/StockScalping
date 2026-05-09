@@ -93,7 +93,8 @@ builder.Services.AddSingleton<ICacheService, CacheService>();
 builder.Services.AddScoped<IApplicationUserRepository, ApplicationUserRepository>();
 builder.Services.AddScoped<IApplicationRoleRepository, ApplicationRoleRepository>();
 builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>();
-builder.Services.AddScoped<ITrackedStockRepository, TrackedStockRepository>();
+builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+builder.Services.AddScoped<ITradePlanRepository, TradePlanRepository>();
 builder.Services.AddScoped<IBrokerSessionRepository, BrokerSessionRepository>();
 builder.Services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
 builder.Services.AddHttpClient<SendGridEmailOtpSender>(client =>
@@ -122,9 +123,10 @@ builder.Services.AddHttpClient<IMobileOtpSender, TwilioMobileOtpSender>(client =
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IWatchlistService, WatchlistService>();
+builder.Services.AddScoped<ITradePlanService, TradePlanService>();
 builder.Services.AddScoped<IStringEncryptionService, AesStringEncryptionService>();
 builder.Services.AddScoped<IBrokerSessionStore, BrokerSessionStore>();
-builder.Services.AddScoped<IScalpingQueryService, ScalpingQueryService>();
 builder.Services.AddHttpClient<AngelOneService>();
 builder.Services.AddScoped<IBrokerService>(serviceProvider =>
 {
@@ -135,7 +137,6 @@ builder.Services.AddScoped<IBrokerService>(serviceProvider =>
         ? serviceProvider.GetRequiredService<AngelOneService>()
         : throw new InvalidOperationException($"Unsupported broker '{activeBroker}'.");
 });
-builder.Services.AddHostedService<ScalpingService>();
 
 var app = builder.Build();
 

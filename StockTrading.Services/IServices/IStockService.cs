@@ -7,5 +7,5 @@ public interface IStockService
 {
     Task<HoldingsResponse> GetHoldingsAsync(CancellationToken cancellationToken = default);
     Task<List<StockPrice>> GetConfiguredPricesAsync(CancellationToken cancellationToken = default);
-    Task<List<StockPrice>> GetPricesAsync(IEnumerable<TrackedStock> stocks, CancellationToken cancellationToken = default);
+    Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks, CancellationToken cancellationToken = default);
 }
