@@ -330,7 +330,7 @@ select {
   border-radius: 6px;
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(180px, 1fr) 120px 120px auto;
+  grid-template-columns: minmax(180px, 1fr) 120px 120px minmax(160px, auto);
   padding: 12px;
 }
 
@@ -503,6 +503,147 @@ th {
   margin: 12px 0 0;
 }
 
+.modal-backdrop {
+  align-items: center;
+  background: rgba(23, 32, 38, 0.56);
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  padding: 24px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 20;
+}
+
+.chart-modal {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 22px 80px rgba(23, 32, 38, 0.28);
+  display: grid;
+  gap: 14px;
+  max-height: calc(100vh - 48px);
+  max-width: 1120px;
+  overflow: auto;
+  padding: 18px;
+  width: min(1120px, 100%);
+}
+
+.chart-modal-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-range-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-range-tabs button {
+  background: #edf3f2;
+  color: #2f3a40;
+  min-height: 36px;
+}
+
+.chart-range-tabs button.active {
+  background: #146c5f;
+  color: #ffffff;
+}
+
+.chart-surface {
+  border: 1px solid #edf2f4;
+  border-radius: 6px;
+  min-height: 460px;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.stock-chart {
+  display: block;
+  height: auto;
+  max-height: 520px;
+  width: 100%;
+}
+
+.chart-axis {
+  stroke: #d2dfdc;
+  stroke-width: 1;
+}
+
+.stock-chart text {
+  fill: #577079;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-grid line {
+  stroke: #edf2f4;
+  stroke-width: 1;
+}
+
+.chart-y-label {
+  fill: #7b8f96;
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: end;
+}
+
+.chart-x-label {
+  fill: #7b8f96;
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.chart-bound-label {
+  fill: #2f3a40;
+  font-weight: 800;
+}
+
+.chart-bound-max {
+  text-anchor: end;
+}
+
+.stock-chart polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.chart-hover line {
+  stroke: #577079;
+  stroke-dasharray: 4 4;
+}
+
+.chart-hover circle {
+  fill: #ffffff;
+  stroke: #146c5f;
+  stroke-width: 3;
+}
+
+.chart-hover rect {
+  fill: #172026;
+}
+
+.chart-hover text {
+  fill: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.positive-line {
+  stroke: #087443;
+}
+
+.negative-line {
+  stroke: #b42318;
+}
+
 @media (max-width: 760px) {
   .topbar {
     align-items: flex-start;
@@ -566,6 +707,16 @@ th {
 
   .row-actions button {
     flex: 1;
+  }
+
+  .modal-backdrop {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .chart-modal-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

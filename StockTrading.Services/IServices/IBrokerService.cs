@@ -9,6 +9,12 @@ public interface IBrokerService
     Task<AccountProfile?> GetProfileAsync();
     Task<HoldingsResponse> GetHoldingsAsync();
     Task<List<StockSearchResult>> SearchStocksAsync(string query, StockExchange exchange = StockExchange.NSE);
+    Task<List<StockCandle>> GetCandlesAsync(
+        string symbolToken,
+        StockExchange exchange = StockExchange.NSE,
+        StockChartInterval interval = StockChartInterval.ONE_DAY,
+        DateTime? from = null,
+        DateTime? to = null);
     Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks);
     Task<List<OrderDetails>> GetOrdersAsync();
     Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request);

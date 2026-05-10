@@ -22,6 +22,17 @@ public sealed class StockService(
         return brokerService.SearchStocksAsync(query, exchange);
     }
 
+    public Task<List<StockCandle>> GetCandlesAsync(
+        string symbolToken,
+        StockExchange exchange = StockExchange.NSE,
+        StockChartInterval interval = StockChartInterval.ONE_DAY,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken cancellationToken = default)
+    {
+        return brokerService.GetCandlesAsync(symbolToken, exchange, interval, from, to);
+    }
+
     public async Task<List<StockPrice>> GetConfiguredPricesAsync(CancellationToken cancellationToken = default)
     {
         var stocks = await watchlistRepository.GetAllAsync(cancellationToken);

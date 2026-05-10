@@ -1,8 +1,18 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, setToken } from "./auth/authStorage";
 import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartApiLogin } from "./api/accountApi";
 import { authExpiredEventName } from "./api/apiClient";
-import { getHoldings, getPrices, HoldingStock, StockExchange, StockPrice, StockSearchResult } from "./api/stockApi";
+import {
+  getHoldings,
+  getPrices,
+  getStockChart,
+  HoldingStock,
+  StockCandle,
+  StockChartRange,
+  StockExchange,
+  StockPrice,
+  StockSearchResult
+} from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
 import { deleteTradePlan, getTradePlans, saveTradePlan, searchTradePlanStocks, TradePlan } from "./api/tradePlanApi";
 import {
@@ -19,6 +29,14 @@ import {
 
 type View = "holdings" | "prices" | "orders";
 type Page = "dashboard" | "watchlists" | "tradeplans";
+
+const chartRanges: { label: string; value: StockChartRange }[] = [
+  { label: "1D", value: "OneDay" },
+  { label: "1W", value: "OneWeek" },
+  { label: "1M", value: "OneMonth" },
+  { label: "6M", value: "SixMonths" },
+  { label: "1Y", value: "OneYear" }
+];
 
 const emptyWatchlistStock: WatchlistStock = {
   symbol: "",
@@ -51,6 +69,109 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function StockLineChart({ candles }: { candles: StockCandle[] }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const width = 1000;
+  const height = 420;
+  const paddingLeft = 84;
+  const paddingRight = 40;
+  const paddingTop = 46;
+  const paddingBottom = 58;
+  const closes = candles.map((candle) => candle.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const chartPoints = candles.map((candle, index) => {
+    const x = paddingLeft + (index / Math.max(candles.length - 1, 1)) * (width - paddingLeft - paddingRight);
+    const y = height - paddingBottom - ((candle.close - min) / range) * (height - paddingTop - paddingBottom);
+    return { candle, x, y };
+  });
+  const points = chartPoints.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+  const first = candles[0];
+  const last = candles[candles.length - 1];
+  const positive = last.close >= first.close;
+  const hoverPoint = hoverIndex == null ? null : chartPoints[hoverIndex];
+  const yTicks = Array.from({ length: 5 }, (_, index) => {
+    const value = min + (range * (4 - index)) / 4;
+    const y = paddingTop + (index / 4) * (height - paddingTop - paddingBottom);
+    return { value, y };
+  });
+  const xTickCount = Math.min(5, candles.length);
+  const xTicks = Array.from({ length: xTickCount }, (_, index) => {
+    const candleIndex = Math.round((index / Math.max(xTickCount - 1, 1)) * (candles.length - 1));
+    const point = chartPoints[candleIndex];
+    return {
+      x: point.x,
+      label: new Date(point.candle.time).toLocaleDateString([], { day: "2-digit", month: "short" })
+    };
+  });
+
+  function handleChartHover(event: MouseEvent<SVGSVGElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const relativeX = ((event.clientX - bounds.left) / bounds.width) * width;
+    const index = Math.round(
+      ((relativeX - paddingLeft) / (width - paddingLeft - paddingRight)) * Math.max(candles.length - 1, 1)
+    );
+    setHoverIndex(Math.min(Math.max(index, 0), candles.length - 1));
+  }
+
+  return (
+    <svg
+      className="stock-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label="Stock closing price chart"
+      onMouseMove={handleChartHover}
+      onMouseLeave={() => setHoverIndex(null)}
+    >
+      {yTicks.map((tick) => (
+        <g className="chart-grid" key={tick.y}>
+          <line x1={paddingLeft} y1={tick.y} x2={width - paddingRight} y2={tick.y} />
+          <text className="chart-y-label" x={paddingLeft - 10} y={tick.y + 4}>
+            {tick.value.toFixed(2)}
+          </text>
+        </g>
+      ))}
+      {xTicks.map((tick) => (
+        <g className="chart-grid" key={`${tick.x}-${tick.label}`}>
+          <line x1={tick.x} y1={paddingTop} x2={tick.x} y2={height - paddingBottom} />
+          <text className="chart-x-label" x={tick.x} y={height - 18}>
+            {tick.label}
+          </text>
+        </g>
+      ))}
+      <line className="chart-axis" x1={paddingLeft} y1={paddingTop} x2={paddingLeft} y2={height - paddingBottom} />
+      <line className="chart-axis" x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingRight} y2={height - paddingBottom} />
+      <text className="chart-bound-label chart-bound-max" x={width - paddingRight} y={20}>
+        Max {formatMoney(max)}
+      </text>
+      <text className="chart-bound-label chart-bound-max" x={width - paddingRight} y={40}>
+        Min {formatMoney(min)}
+      </text>
+      <polyline className={positive ? "positive-line" : "negative-line"} points={points} />
+      {hoverPoint && (
+        <g className="chart-hover">
+          <line x1={hoverPoint.x} y1={paddingTop} x2={hoverPoint.x} y2={height - paddingBottom} />
+          <circle cx={hoverPoint.x} cy={hoverPoint.y} r="5" />
+          <rect
+            x={Math.min(hoverPoint.x + 12, width - 190)}
+            y={Math.max(hoverPoint.y - 48, paddingTop)}
+            width="178"
+            height="42"
+            rx="6"
+          />
+          <text x={Math.min(hoverPoint.x + 22, width - 180)} y={Math.max(hoverPoint.y - 29, paddingTop + 19)}>
+            {new Date(hoverPoint.candle.time).toLocaleDateString()}
+          </text>
+          <text x={Math.min(hoverPoint.x + 22, width - 180)} y={Math.max(hoverPoint.y - 11, paddingTop + 37)}>
+            {formatMoney(hoverPoint.candle.close)}
+          </text>
+        </g>
+      )}
+    </svg>
+  );
+}
+
 function App() {
   const [token, setCurrentToken] = useState(() => getToken());
   const [loginMethod, setLoginMethod] = useState<LoginMethod>(LoginMethod.EmailOtp);
@@ -75,6 +196,10 @@ function App() {
   const [watchlistStockSearch, setWatchlistStockSearch] = useState("");
   const [watchlistStockSearchResults, setWatchlistStockSearchResults] = useState<StockSearchResult[]>([]);
   const [isWatchlistStockSearching, setIsWatchlistStockSearching] = useState(false);
+  const [chartStock, setChartStock] = useState<WatchlistStock | null>(null);
+  const [chartRange, setChartRange] = useState<StockChartRange>("OneMonth");
+  const [chartCandles, setChartCandles] = useState<StockCandle[]>([]);
+  const [isChartLoading, setIsChartLoading] = useState(false);
   const [tradePlans, setTradePlans] = useState<TradePlan[]>([]);
   const [tradePlanForm, setTradePlanForm] = useState<TradePlan>(emptyTradePlan);
   const [tradePlanStockSearch, setTradePlanStockSearch] = useState("");
@@ -327,6 +452,52 @@ function App() {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function loadStockChart(stock: WatchlistStock, range: StockChartRange) {
+    if (!stock.symbolToken) {
+      setMessageType("error");
+      setMessage("Symbol token is required for chart.");
+      return;
+    }
+
+    setIsChartLoading(true);
+    setMessage("");
+
+    try {
+      const result = await getStockChart(stock.symbolToken, stock.exchange as StockExchange, range);
+      setChartCandles(result.candles);
+      if (result.candles.length === 0) {
+        setMessageType("error");
+        setMessage("No chart data found.");
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load stock chart.");
+    } finally {
+      setIsChartLoading(false);
+    }
+  }
+
+  function openStockChart(stock: WatchlistStock) {
+    setChartStock(stock);
+    setChartRange("OneMonth");
+    setChartCandles([]);
+    void loadStockChart(stock, "OneMonth");
+  }
+
+  function closeStockChart() {
+    setChartStock(null);
+    setChartCandles([]);
+  }
+
+  function handleChartRangeChange(range: StockChartRange) {
+    if (!chartStock) {
+      return;
+    }
+
+    setChartRange(range);
+    void loadStockChart(chartStock, range);
   }
 
   async function loadTradePlans() {
@@ -826,7 +997,7 @@ function App() {
                       purchaseRate: event.target.value ? Number(event.target.value) : null
                     }))
                   }
-                  placeholder="0.00"
+                  placeholder="Optional"
                 />
               </label>
               <label>
@@ -841,7 +1012,7 @@ function App() {
                       salesRate: event.target.value ? Number(event.target.value) : null
                     }))
                   }
-                  placeholder="0.00"
+                  placeholder="Optional"
                 />
               </label>
               <button type="submit" disabled={isBusy || !selectedWatchlistId}>
@@ -860,15 +1031,20 @@ function App() {
                   </div>
                   <div>
                     <span>Buy</span>
-                    <strong>{stock.purchaseRate ? formatMoney(stock.purchaseRate) : "-"}</strong>
+                    <strong>{stock.purchaseRate != null ? formatMoney(stock.purchaseRate) : "-"}</strong>
                   </div>
                   <div>
                     <span>Sell</span>
-                    <strong>{stock.salesRate ? formatMoney(stock.salesRate) : "-"}</strong>
+                    <strong>{stock.salesRate != null ? formatMoney(stock.salesRate) : "-"}</strong>
                   </div>
-                  <button type="button" className="secondary" onClick={() => void handleDeleteSelectedWatchlistStock(stock)} disabled={isBusy}>
-                    Remove
-                  </button>
+                  <div className="row-actions">
+                    <button type="button" onClick={() => openStockChart(stock)} disabled={isBusy || !stock.symbolToken}>
+                      Chart
+                    </button>
+                    <button type="button" className="secondary" onClick={() => void handleDeleteSelectedWatchlistStock(stock)} disabled={isBusy}>
+                      Remove
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -1089,6 +1265,42 @@ function App() {
             ))}
           </div>
         </section>
+      )}
+
+      {chartStock && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="chart-modal" role="dialog" aria-modal="true" aria-label="Stock chart">
+            <div className="chart-modal-header">
+              <div>
+                <p className="eyebrow">{chartStock.exchange}</p>
+                <h2>{chartStock.tradingSymbol || chartStock.symbol}</h2>
+              </div>
+              <button type="button" className="secondary" onClick={closeStockChart}>
+                Close
+              </button>
+            </div>
+
+            <div className="chart-range-tabs">
+              {chartRanges.map((range) => (
+                <button
+                  type="button"
+                  className={chartRange === range.value ? "active" : ""}
+                  key={range.value}
+                  onClick={() => handleChartRangeChange(range.value)}
+                  disabled={isChartLoading}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="chart-surface">
+              {isChartLoading && <p className="helper-text">Loading chart...</p>}
+              {!isChartLoading && chartCandles.length === 0 && <p className="helper-text">No chart data available.</p>}
+              {!isChartLoading && chartCandles.length > 0 && <StockLineChart candles={chartCandles} />}
+            </div>
+          </section>
+        </div>
       )}
 
       {page === "dashboard" && (

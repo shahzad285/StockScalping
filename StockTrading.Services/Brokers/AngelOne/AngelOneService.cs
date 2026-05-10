@@ -888,6 +888,55 @@ public class AngelOneService : IBrokerService
         return new List<string>();
     }
 
+    private static StockCandle? ParseCandle(JsonElement item)
+    {
+        if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() < 6)
+        {
+            return null;
+        }
+
+        var values = item.EnumerateArray().ToArray();
+        var timeText = GetJsonString(values[0]);
+        if (!DateTime.TryParse(timeText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var time))
+        {
+            return null;
+        }
+
+        return new StockCandle
+        {
+            Time = time,
+            Open = GetJsonDecimal(values[1]),
+            High = GetJsonDecimal(values[2]),
+            Low = GetJsonDecimal(values[3]),
+            Close = GetJsonDecimal(values[4]),
+            Volume = GetJsonLong(values[5])
+        };
+    }
+
+    private static long GetJsonLong(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Number)
+        {
+            if (element.TryGetInt64(out var longValue))
+            {
+                return longValue;
+            }
+
+            if (element.TryGetDecimal(out var decimalValue))
+            {
+                return (long)decimalValue;
+            }
+        }
+
+        if (element.ValueKind == JsonValueKind.String &&
+            decimal.TryParse(element.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedValue))
+        {
+            return (long)parsedValue;
+        }
+
+        return 0;
+    }
+
     private static int GetJsonIntProperty(JsonElement element, params string[] propertyNames)
     {
         foreach (var propertyName in propertyNames)
@@ -1168,6 +1217,66 @@ public class AngelOneService : IBrokerService
             SymbolToken = instrument.SymbolToken,
             Name = instrument.Name
         }).ToList();
+    }
+
+    public async Task<List<StockCandle>> GetCandlesAsync(
+        string symbolToken,
+        StockExchange exchange = StockExchange.NSE,
+        StockChartInterval interval = StockChartInterval.ONE_DAY,
+        DateTime? from = null,
+        DateTime? to = null)
+    {
+        if (string.IsNullOrWhiteSpace(symbolToken))
+        {
+            return new List<StockCandle>();
+        }
+
+        if (!await EnsureJwtToken())
+        {
+            return new List<StockCandle>();
+        }
+
+        var toDate = to ?? DateTime.Now;
+        var fromDate = from ?? toDate.AddMonths(-1);
+
+        SetDefaultHeaders(_jwtToken);
+
+        var candleRequest = new
+        {
+            exchange = exchange.ToString(),
+            symboltoken = symbolToken.Trim(),
+            interval = interval.ToString(),
+            fromdate = fromDate.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+            todate = toDate.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            "/rest/secure/angelbroking/historical/v1/getCandleData",
+            candleRequest);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            System.Console.WriteLine($"Failed to fetch candle data for {symbolToken}: {response.StatusCode}");
+            System.Console.WriteLine($"Candle Response Body: {content}");
+            return new List<StockCandle>();
+        }
+
+        using var jsonDoc = JsonDocument.Parse(content);
+        var root = jsonDoc.RootElement;
+
+        if (!root.TryGetProperty("data", out var dataElement) ||
+            dataElement.ValueKind != JsonValueKind.Array)
+        {
+            return new List<StockCandle>();
+        }
+
+        return dataElement.EnumerateArray()
+            .Select(ParseCandle)
+            .Where(candle => candle != null)
+            .Select(candle => candle!)
+            .OrderBy(candle => candle.Time)
+            .ToList();
     }
 
     public Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks)
