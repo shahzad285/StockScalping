@@ -193,6 +193,7 @@ function App() {
   const [watchlistStockSearch, setWatchlistStockSearch] = useState("");
   const [watchlistStockSearchResults, setWatchlistStockSearchResults] = useState<StockSearchResult[]>([]);
   const [isWatchlistStockSearching, setIsWatchlistStockSearching] = useState(false);
+  const [stockDetails, setStockDetails] = useState<WatchlistStock | null>(null);
   const [chartStock, setChartStock] = useState<WatchlistStock | null>(null);
   const [chartRange, setChartRange] = useState<StockChartRange>("OneMonth");
   const [chartCandles, setChartCandles] = useState<StockCandle[]>([]);
@@ -202,6 +203,7 @@ function App() {
   const [tradePlanStockSearch, setTradePlanStockSearch] = useState("");
   const [tradePlanStockSearchResults, setTradePlanStockSearchResults] = useState<StockSearchResult[]>([]);
   const [isTradePlanStockSearching, setIsTradePlanStockSearching] = useState(false);
+  const [tradePlanDetails, setTradePlanDetails] = useState<TradePlan | null>(null);
   const [totalProfitLoss, setTotalProfitLoss] = useState(0);
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
@@ -425,6 +427,14 @@ function App() {
     setChartCandles([]);
   }
 
+  function openStockDetails(stock: WatchlistStock) {
+    setStockDetails(stock);
+  }
+
+  function closeStockDetails() {
+    setStockDetails(null);
+  }
+
   function handleChartRangeChange(range: StockChartRange) {
     if (!chartStock) {
       return;
@@ -529,6 +539,14 @@ function App() {
     setTradePlanStockSearch(tradePlan.tradingSymbol || tradePlan.symbol);
     setTradePlanStockSearchResults([]);
     setMessage("");
+  }
+
+  function openTradePlanDetails(tradePlan: TradePlan) {
+    setTradePlanDetails(tradePlan);
+  }
+
+  function closeTradePlanDetails() {
+    setTradePlanDetails(null);
   }
 
   async function handleDeleteTradePlan(id: number) {
@@ -970,6 +988,9 @@ function App() {
                     <strong>{stock.theme || "-"}</strong>
                   </div>
                   <div className="row-actions">
+                    <button type="button" className="secondary" onClick={() => openStockDetails(stock)}>
+                      Details
+                    </button>
                     <button type="button" onClick={() => openStockChart(stock)} disabled={isBusy || !stock.symbolToken}>
                       Chart
                     </button>
@@ -1181,6 +1202,9 @@ function App() {
                   <strong>{tradePlan.status || (tradePlan.isActive ? "Active" : "Paused")}</strong>
                 </div>
                 <div className="row-actions">
+                  <button type="button" className="secondary" onClick={() => openTradePlanDetails(tradePlan)}>
+                    Details
+                  </button>
                   <button type="button" className="secondary" onClick={() => handleEditTradePlan(tradePlan)} disabled={isBusy}>
                     Edit
                   </button>
@@ -1197,6 +1221,152 @@ function App() {
             ))}
           </div>
         </section>
+      )}
+
+      {tradePlanDetails && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="details-modal" role="dialog" aria-modal="true" aria-label="Trade plan details">
+            <div className="chart-modal-header">
+              <div>
+                <p className="eyebrow">{tradePlanDetails.exchange}</p>
+                <h2>{tradePlanDetails.tradingSymbol || tradePlanDetails.symbol}</h2>
+              </div>
+              <button type="button" className="secondary" onClick={closeTradePlanDetails}>
+                Close
+              </button>
+            </div>
+
+            <div className="stock-detail-grid">
+              <div>
+                <span>Symbol</span>
+                <strong>{tradePlanDetails.symbol || "-"}</strong>
+              </div>
+              <div>
+                <span>Trading symbol</span>
+                <strong>{tradePlanDetails.tradingSymbol || "-"}</strong>
+              </div>
+              <div>
+                <span>Exchange</span>
+                <strong>{tradePlanDetails.exchange || "-"}</strong>
+              </div>
+              <div>
+                <span>Symbol token</span>
+                <strong>{tradePlanDetails.symbolToken || "-"}</strong>
+              </div>
+              <div>
+                <span>Buy price</span>
+                <strong>{formatMoney(tradePlanDetails.buyPrice)}</strong>
+              </div>
+              <div>
+                <span>Sell price</span>
+                <strong>{formatMoney(tradePlanDetails.sellPrice)}</strong>
+              </div>
+              <div>
+                <span>Quantity</span>
+                <strong>{tradePlanDetails.quantity}</strong>
+              </div>
+              <div>
+                <span>Max budget</span>
+                <strong>{tradePlanDetails.maxBudget == null ? "-" : formatMoney(tradePlanDetails.maxBudget)}</strong>
+              </div>
+              <div>
+                <span>Status</span>
+                <strong>{tradePlanDetails.status || (tradePlanDetails.isActive ? "Active" : "Paused")}</strong>
+              </div>
+              <div>
+                <span>Active</span>
+                <strong>{tradePlanDetails.isActive ? "Yes" : "No"}</strong>
+              </div>
+              <div>
+                <span>Repeat</span>
+                <strong>{tradePlanDetails.repeatEnabled ? "Yes" : "No"}</strong>
+              </div>
+              <div>
+                <span>Buy triggers</span>
+                <strong>{tradePlanDetails.buyTriggerCount ?? 0}</strong>
+              </div>
+              <div>
+                <span>Sell triggers</span>
+                <strong>{tradePlanDetails.sellTriggerCount ?? 0}</strong>
+              </div>
+              <div>
+                <span>Last buy trigger</span>
+                <strong>
+                  {tradePlanDetails.lastBuyTriggeredAtUtc
+                    ? new Date(tradePlanDetails.lastBuyTriggeredAtUtc).toLocaleString()
+                    : "-"}
+                </strong>
+              </div>
+              <div>
+                <span>Last sell trigger</span>
+                <strong>
+                  {tradePlanDetails.lastSellTriggeredAtUtc
+                    ? new Date(tradePlanDetails.lastSellTriggeredAtUtc).toLocaleString()
+                    : "-"}
+                </strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {stockDetails && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="details-modal" role="dialog" aria-modal="true" aria-label="Stock details">
+            <div className="chart-modal-header">
+              <div>
+                <p className="eyebrow">{stockDetails.exchange}</p>
+                <h2>{stockDetails.tradingSymbol || stockDetails.symbol}</h2>
+              </div>
+              <button type="button" className="secondary" onClick={closeStockDetails}>
+                Close
+              </button>
+            </div>
+
+            <div className="stock-detail-grid">
+              <div>
+                <span>Symbol</span>
+                <strong>{stockDetails.symbol || "-"}</strong>
+              </div>
+              <div>
+                <span>Trading symbol</span>
+                <strong>{stockDetails.tradingSymbol || "-"}</strong>
+              </div>
+              <div>
+                <span>Exchange</span>
+                <strong>{stockDetails.exchange || "-"}</strong>
+              </div>
+              <div>
+                <span>Symbol token</span>
+                <strong>{stockDetails.symbolToken || "-"}</strong>
+              </div>
+              <div>
+                <span>Asset type</span>
+                <strong>{stockDetails.assetType || "Unknown"}</strong>
+              </div>
+              <div>
+                <span>Theme</span>
+                <strong>{stockDetails.theme || "-"}</strong>
+              </div>
+              <div>
+                <span>Sector</span>
+                <strong>{stockDetails.sector || "-"}</strong>
+              </div>
+              <div>
+                <span>Industry</span>
+                <strong>{stockDetails.industry || "-"}</strong>
+              </div>
+              <div>
+                <span>Confidence</span>
+                <strong>{stockDetails.confidenceScore == null ? "-" : `${stockDetails.confidenceScore}%`}</strong>
+              </div>
+              <div className="stock-detail-wide">
+                <span>Classification reason</span>
+                <strong>{stockDetails.classificationReason || "-"}</strong>
+              </div>
+            </div>
+          </section>
+        </div>
       )}
 
       {chartStock && (

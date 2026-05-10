@@ -517,7 +517,8 @@ th {
   z-index: 20;
 }
 
-.chart-modal {
+.chart-modal,
+.details-modal {
   background: #ffffff;
   border-radius: 8px;
   box-shadow: 0 22px 80px rgba(23, 32, 38, 0.28);
@@ -530,11 +531,45 @@ th {
   width: min(1120px, 100%);
 }
 
+.details-modal {
+  max-width: 760px;
+  width: min(760px, 100%);
+}
+
 .chart-modal-header {
   align-items: center;
   display: flex;
   justify-content: space-between;
   gap: 12px;
+}
+
+.stock-detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stock-detail-grid div {
+  border: 1px solid #edf2f4;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.stock-detail-grid span {
+  color: #577079;
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.stock-detail-grid strong {
+  color: #2f3a40;
+  overflow-wrap: anywhere;
+}
+
+.stock-detail-wide {
+  grid-column: 1 / -1;
 }
 
 .chart-range-tabs {
@@ -694,6 +729,10 @@ th {
 
   .stock-search-field,
   .selected-stock-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .stock-detail-grid {
     grid-template-columns: 1fr;
   }
 
