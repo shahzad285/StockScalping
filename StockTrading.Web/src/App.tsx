@@ -4,6 +4,7 @@ import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartA
 import { authExpiredEventName } from "./api/apiClient";
 import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
+import { deleteTradePlan, getTradePlans, saveTradePlan, TradePlan } from "./api/tradePlanApi";
 import {
   createWatchlist,
   deleteStockFromWatchlist,
@@ -16,7 +17,7 @@ import {
 } from "./api/watchlistApi";
 
 type View = "holdings" | "prices" | "orders";
-type Page = "dashboard" | "watchlists";
+type Page = "dashboard" | "watchlists" | "tradeplans";
 
 const emptyWatchlistStock: WatchlistStock = {
   symbol: "",
@@ -25,6 +26,20 @@ const emptyWatchlistStock: WatchlistStock = {
   tradingSymbol: "",
   purchaseRate: null,
   salesRate: null
+};
+
+const emptyTradePlan: TradePlan = {
+  buyPrice: 0,
+  sellPrice: 0,
+  quantity: 1,
+  maxBudget: null,
+  status: "Active",
+  isActive: true,
+  repeatEnabled: true,
+  symbol: "",
+  exchange: "NSE",
+  symbolToken: "",
+  tradingSymbol: ""
 };
 
 function formatMoney(value: number): string {
@@ -56,6 +71,8 @@ function App() {
   const [selectedWatchlistStocks, setSelectedWatchlistStocks] = useState<WatchlistStock[]>([]);
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [selectedWatchlistForm, setSelectedWatchlistForm] = useState<WatchlistStock>(emptyWatchlistStock);
+  const [tradePlans, setTradePlans] = useState<TradePlan[]>([]);
+  const [tradePlanForm, setTradePlanForm] = useState<TradePlan>(emptyTradePlan);
   const [totalProfitLoss, setTotalProfitLoss] = useState(0);
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
@@ -258,6 +275,73 @@ function App() {
     }
   }
 
+  async function loadTradePlans() {
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await getTradePlans();
+      setTradePlans(result.tradePlans);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load trade plans.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleTradePlanSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await saveTradePlan({
+        ...tradePlanForm,
+        maxBudget: tradePlanForm.maxBudget ?? null,
+        tradingSymbol: tradePlanForm.tradingSymbol || tradePlanForm.symbol
+      });
+      setTradePlanForm(emptyTradePlan);
+      setMessageType("success");
+      setMessage(tradePlanForm.id ? "Trade plan updated." : "Trade plan created.");
+      await loadTradePlans();
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to save trade plan.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handleEditTradePlan(tradePlan: TradePlan) {
+    setTradePlanForm({
+      ...tradePlan,
+      maxBudget: tradePlan.maxBudget ?? null,
+      status: tradePlan.status || "Active"
+    });
+    setMessage("");
+  }
+
+  async function handleDeleteTradePlan(id: number) {
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await deleteTradePlan(id);
+      setTradePlans((current) => current.filter((tradePlan) => tradePlan.id !== id));
+      if (tradePlanForm.id === id) {
+        setTradePlanForm(emptyTradePlan);
+      }
+      setMessageType("success");
+      setMessage("Trade plan removed.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to remove trade plan.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   const isEmailLogin = loginMethod === LoginMethod.EmailOtp;
   const isPhoneLogin = loginMethod === LoginMethod.PhoneOtp;
   const isGoogleLogin = loginMethod === LoginMethod.GoogleOAuth;
@@ -325,8 +409,24 @@ function App() {
     setWatchlists([]);
     setSelectedWatchlistId(null);
     setSelectedWatchlistStocks([]);
+    setTradePlans([]);
+    setTradePlanForm(emptyTradePlan);
     setPage("dashboard");
   }, []);
+
+  function handleRefresh() {
+    if (page === "watchlists") {
+      void loadWatchlists();
+      return;
+    }
+
+    if (page === "tradeplans") {
+      void loadTradePlans();
+      return;
+    }
+
+    void loadDashboard();
+  }
 
   function handleLogout() {
     clearToken();
@@ -351,6 +451,12 @@ function App() {
   useEffect(() => {
     if (token && page === "watchlists") {
       void loadWatchlists();
+    }
+  }, [token, page]);
+
+  useEffect(() => {
+    if (token && page === "tradeplans") {
+      void loadTradePlans();
     }
   }, [token, page]);
 
@@ -473,7 +579,10 @@ function App() {
           <button type="button" className={page === "watchlists" ? "" : "secondary"} onClick={() => setPage("watchlists")}>
             Watchlists
           </button>
-          <button type="button" onClick={loadDashboard} disabled={isBusy}>
+          <button type="button" className={page === "tradeplans" ? "" : "secondary"} onClick={() => setPage("tradeplans")}>
+            Trade Plan
+          </button>
+          <button type="button" onClick={handleRefresh} disabled={isBusy}>
             {isBusy ? "Refreshing..." : "Refresh"}
           </button>
           <button type="button" className="secondary" onClick={handleLogout}>
@@ -627,6 +736,181 @@ function App() {
                 </article>
               ))}
             </div>
+          </div>
+        </section>
+      )}
+
+      {page === "tradeplans" && (
+        <section className="plan-panel">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Trade Plan</p>
+              <h2>{tradePlanForm.id ? "Edit plan" : "New plan"}</h2>
+            </div>
+            {tradePlanForm.id && (
+              <button type="button" className="secondary" onClick={() => setTradePlanForm(emptyTradePlan)}>
+                New plan
+              </button>
+            )}
+          </div>
+
+          <form className="stock-plan-form trade-plan-form" onSubmit={handleTradePlanSubmit}>
+            <label>
+              Symbol
+              <input
+                value={tradePlanForm.symbol}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, symbol: event.target.value }))}
+                placeholder="RELIANCE"
+                required
+              />
+            </label>
+            <label>
+              Exchange
+              <input
+                value={tradePlanForm.exchange}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, exchange: event.target.value }))}
+                placeholder="NSE"
+                required
+              />
+            </label>
+            <label>
+              Symbol token
+              <input
+                value={tradePlanForm.symbolToken}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, symbolToken: event.target.value }))}
+                placeholder="2885"
+                required
+              />
+            </label>
+            <label>
+              Trading symbol
+              <input
+                value={tradePlanForm.tradingSymbol}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, tradingSymbol: event.target.value }))}
+                placeholder="RELIANCE-EQ"
+              />
+            </label>
+            <label>
+              Buy price
+              <input
+                type="number"
+                step="0.05"
+                value={tradePlanForm.buyPrice || ""}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, buyPrice: Number(event.target.value) }))}
+                placeholder="0.00"
+                required
+              />
+            </label>
+            <label>
+              Sell price
+              <input
+                type="number"
+                step="0.05"
+                value={tradePlanForm.sellPrice || ""}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, sellPrice: Number(event.target.value) }))}
+                placeholder="0.00"
+                required
+              />
+            </label>
+            <label>
+              Quantity
+              <input
+                type="number"
+                step="1"
+                min="1"
+                value={tradePlanForm.quantity || ""}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, quantity: Number(event.target.value) }))}
+                placeholder="1"
+                required
+              />
+            </label>
+            <label>
+              Max budget
+              <input
+                type="number"
+                step="0.05"
+                value={tradePlanForm.maxBudget ?? ""}
+                onChange={(event) =>
+                  setTradePlanForm((current) => ({
+                    ...current,
+                    maxBudget: event.target.value ? Number(event.target.value) : null
+                  }))
+                }
+                placeholder="Optional"
+              />
+            </label>
+            <label>
+              Status
+              <select
+                value={tradePlanForm.status || "Active"}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, status: event.target.value }))}
+              >
+                <option value="Active">Active</option>
+                <option value="Paused">Paused</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </label>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={tradePlanForm.isActive}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, isActive: event.target.checked }))}
+              />
+              Active
+            </label>
+            <label className="checkbox-field">
+              <input
+                type="checkbox"
+                checked={tradePlanForm.repeatEnabled}
+                onChange={(event) => setTradePlanForm((current) => ({ ...current, repeatEnabled: event.target.checked }))}
+              />
+              Repeat
+            </label>
+            <button type="submit" disabled={isBusy}>
+              {tradePlanForm.id ? "Update plan" : "Save plan"}
+            </button>
+          </form>
+
+          <div className="planned-stocks trade-plan-list">
+            {tradePlans.map((tradePlan) => (
+              <article key={tradePlan.id || `${tradePlan.exchange}-${tradePlan.symbolToken}`}>
+                <div>
+                  <strong>{tradePlan.tradingSymbol || tradePlan.symbol}</strong>
+                  <span>
+                    {tradePlan.exchange} - {tradePlan.symbolToken}
+                  </span>
+                </div>
+                <div>
+                  <span>Buy</span>
+                  <strong>{formatMoney(tradePlan.buyPrice)}</strong>
+                </div>
+                <div>
+                  <span>Sell</span>
+                  <strong>{formatMoney(tradePlan.sellPrice)}</strong>
+                </div>
+                <div>
+                  <span>Qty</span>
+                  <strong>{tradePlan.quantity}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{tradePlan.status || (tradePlan.isActive ? "Active" : "Paused")}</strong>
+                </div>
+                <div className="row-actions">
+                  <button type="button" className="secondary" onClick={() => handleEditTradePlan(tradePlan)} disabled={isBusy}>
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => tradePlan.id && void handleDeleteTradePlan(tradePlan.id)}
+                    disabled={isBusy || !tradePlan.id}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       )}
