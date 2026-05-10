@@ -7,6 +7,7 @@
 - Add chart-derived details below the stock chart: open, high, low, close, 52-week high, and 52-week low.
 - Improve stock chart readability and hover details as needed.
 - Decide whether chart should also be available from Trade Plan rows.
+- Get details of stocks created or recommended by reputable stock market investors/retailers such as Jhunjhunwala.
 
 ## Later
 
