@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, setToken } from "./auth/authStorage";
 import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartApiLogin } from "./api/accountApi";
+import { authExpiredEventName } from "./api/apiClient";
 import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
 import {
@@ -313,8 +314,7 @@ function App() {
     }
   }
 
-  function handleLogout() {
-    clearToken();
+  const clearSession = useCallback(() => {
     setCurrentToken(null);
     setProfile(null);
     setIsBrokerConnected(false);
@@ -322,6 +322,15 @@ function App() {
     setPrices([]);
     setOrders([]);
     setTotalProfitLoss(0);
+    setWatchlists([]);
+    setSelectedWatchlistId(null);
+    setSelectedWatchlistStocks([]);
+    setPage("dashboard");
+  }, []);
+
+  function handleLogout() {
+    clearToken();
+    clearSession();
   }
 
   function handleLoginMethodChange(method: LoginMethod) {
@@ -344,6 +353,20 @@ function App() {
       void loadWatchlists();
     }
   }, [token, page]);
+
+  useEffect(() => {
+    function handleAuthExpired() {
+      clearSession();
+      setMessageType("error");
+      setMessage("Your session expired. Please login again.");
+    }
+
+    window.addEventListener(authExpiredEventName, handleAuthExpired);
+
+    return () => {
+      window.removeEventListener(authExpiredEventName, handleAuthExpired);
+    };
+  }, [clearSession]);
 
   if (!isLoggedIn) {
     return (

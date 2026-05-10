@@ -1,6 +1,7 @@
-import { getToken } from "../auth/authStorage";
+import { clearToken, getToken } from "../auth/authStorage";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+export const authExpiredEventName = "stocktrading:auth-expired";
 
 export async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -20,6 +21,11 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   });
 
   if (!response.ok) {
+    if (response.status === 401 && token) {
+      clearToken();
+      window.dispatchEvent(new Event(authExpiredEventName));
+    }
+
     const errorText = await response.text();
     throw new Error(formatApiError(errorText, response.status));
   }
