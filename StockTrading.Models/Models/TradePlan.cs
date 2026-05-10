@@ -4,7 +4,7 @@ public class TradePlan
 {
     public int Id { get; set; }
     public int StockId { get; set; }
-    public int? WatchlistItemId { get; set; }
+    public int? WatchlistId { get; set; }
     public decimal BuyPrice { get; set; }
     public decimal SellPrice { get; set; }
     public int Quantity { get; set; } = 1;

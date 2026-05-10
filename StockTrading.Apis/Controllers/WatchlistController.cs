@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.IServices;
 
 namespace StockTrading.Controllers;
@@ -15,34 +16,6 @@ public class WatchlistController : ControllerBase
     {
         _watchlistService = watchlistService;
         _stockService = stockService;
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> Watchlists()
-    {
-        var watchlists = await _watchlistService.GetWatchlistsAsync(HttpContext.RequestAborted);
-        return Ok(new { watchlists });
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> CreateWatchlist(CreateWatchlistRequest request)
-    {
-        try
-        {
-            var watchlist = await _watchlistService.CreateWatchlistAsync(request.Name, HttpContext.RequestAborted);
-            return Ok(new { watchlist });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpDelete("{id:int}")]
-    public async Task<IActionResult> DeleteWatchlist(int id)
-    {
-        await _watchlistService.DeleteWatchlistAsync(id, HttpContext.RequestAborted);
-        return NoContent();
     }
 
     [HttpGet("stocks")]
@@ -97,33 +70,10 @@ public class WatchlistController : ControllerBase
         return NoContent();
     }
 
-    [HttpGet("{id:int}/stocks")]
-    public async Task<IActionResult> WatchlistStocks(int id)
+    [HttpDelete("stocks/by-id/{watchlistId:int}")]
+    public async Task<IActionResult> DeleteStock(int watchlistId)
     {
-        var stocks = await _watchlistService.GetStocksAsync(id, HttpContext.RequestAborted);
-        return Ok(new { stocks });
-    }
-
-    [HttpPost("{id:int}/stocks")]
-    public async Task<IActionResult> SaveWatchlistStock(int id, WatchlistStock stock)
-    {
-        try
-        {
-            var savedStock = await _watchlistService.SaveStockAsync(id, stock, HttpContext.RequestAborted);
-            return Ok(new { stock = savedStock });
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    [HttpDelete("{id:int}/stocks/{watchlistItemId:int}")]
-    public async Task<IActionResult> DeleteWatchlistStock(int id, int watchlistItemId)
-    {
-        await _watchlistService.DeleteStockAsync(id, watchlistItemId, HttpContext.RequestAborted);
+        await _watchlistService.DeleteStockAsync(watchlistId, HttpContext.RequestAborted);
         return NoContent();
     }
 }
-
-public sealed record CreateWatchlistRequest(string Name);

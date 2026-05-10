@@ -52,7 +52,7 @@ public sealed class TradePlanService(ITradePlanRepository tradePlanRepository) :
         {
             Id = tradePlan.Id,
             StockId = tradePlan.StockId,
-            WatchlistItemId = tradePlan.WatchlistItemId,
+            WatchlistId = tradePlan.WatchlistId,
             BuyPrice = tradePlan.BuyPrice,
             SellPrice = tradePlan.SellPrice,
             Quantity = tradePlan.Quantity,

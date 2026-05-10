@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using StockTrading.Common.Enums;
 using StockTrading.IServices;
 using StockTrading.Models;
 

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.IServices;
 using StockTrading.Models;
 

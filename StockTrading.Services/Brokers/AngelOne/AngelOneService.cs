@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.IServices;
 using StockTrading.Models;
 

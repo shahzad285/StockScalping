@@ -15,7 +15,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             select
                 trade_plans.id as Id,
                 trade_plans.stock_id as StockId,
-                trade_plans.watchlist_item_id as WatchlistItemId,
+                trade_plans.watchlist_id as WatchlistId,
                 trade_plans.buy_price as BuyPrice,
                 trade_plans.sell_price as SellPrice,
                 trade_plans.quantity as Quantity,
@@ -76,7 +76,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             saved_trade_plan as (
                 insert into trade_plans (
                     stock_id,
-                    watchlist_item_id,
+                    watchlist_id,
                     buy_price,
                     sell_price,
                     quantity,
@@ -88,7 +88,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 )
                 select
                     saved_stock.id,
-                    @WatchlistItemId,
+                    @WatchlistId,
                     @BuyPrice,
                     @SellPrice,
                     @Quantity,
@@ -103,7 +103,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             select
                 saved_trade_plan.id as Id,
                 saved_trade_plan.stock_id as StockId,
-                saved_trade_plan.watchlist_item_id as WatchlistItemId,
+                saved_trade_plan.watchlist_id as WatchlistId,
                 saved_trade_plan.buy_price as BuyPrice,
                 saved_trade_plan.sell_price as SellPrice,
                 saved_trade_plan.quantity as Quantity,
@@ -159,7 +159,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             saved_trade_plan as (
                 update trade_plans
                 set stock_id = saved_stock.id,
-                    watchlist_item_id = @WatchlistItemId,
+                    watchlist_id = @WatchlistId,
                     buy_price = @BuyPrice,
                     sell_price = @SellPrice,
                     quantity = @Quantity,
@@ -175,7 +175,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             select
                 saved_trade_plan.id as Id,
                 saved_trade_plan.stock_id as StockId,
-                saved_trade_plan.watchlist_item_id as WatchlistItemId,
+                saved_trade_plan.watchlist_id as WatchlistId,
                 saved_trade_plan.buy_price as BuyPrice,
                 saved_trade_plan.sell_price as SellPrice,
                 saved_trade_plan.quantity as Quantity,

@@ -355,7 +355,7 @@ select {
 .watchlists-page {
   display: grid;
   gap: 18px;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   margin-top: 18px;
 }
 

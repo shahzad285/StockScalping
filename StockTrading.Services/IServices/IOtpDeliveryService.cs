@@ -1,3 +1,4 @@
+using StockTrading.Common.Enums;
 using StockTrading.Models;
 
 namespace StockTrading.IServices;

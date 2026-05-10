@@ -1,4 +1,5 @@
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 
 namespace StockTrading.IServices;
 

@@ -16,14 +16,10 @@ import {
 import { getOrders, OrderDetails } from "./api/orderApi";
 import { deleteTradePlan, getTradePlans, saveTradePlan, searchTradePlanStocks, TradePlan } from "./api/tradePlanApi";
 import {
-  createWatchlist,
-  deleteStockFromWatchlist,
-  deleteWatchlist,
-  getWatchlists,
+  deleteWatchlistStockById,
   getWatchlistStocks,
   searchWatchlistStocks,
-  saveStockToWatchlist,
-  Watchlist,
+  saveWatchlistStock,
   WatchlistStock
 } from "./api/watchlistApi";
 
@@ -44,8 +40,24 @@ const emptyWatchlistStock: WatchlistStock = {
   symbolToken: "",
   tradingSymbol: "",
   purchaseRate: null,
-  salesRate: null
+  salesRate: null,
+  assetType: "Unknown",
+  theme: "",
+  sector: "",
+  industry: "",
+  classificationReason: "",
+  confidenceScore: null
 };
+
+const stockAssetTypes = [
+  "Unknown",
+  "SlowGrower",
+  "Stalwart",
+  "FastGrower",
+  "Cyclical",
+  "Turnaround",
+  "AssetPlay"
+];
 
 const emptyTradePlan: TradePlan = {
   buyPrice: 0,
@@ -188,10 +200,7 @@ function App() {
   const [prices, setPrices] = useState<StockPrice[]>([]);
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [page, setPage] = useState<Page>("dashboard");
-  const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
-  const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
-  const [selectedWatchlistStocks, setSelectedWatchlistStocks] = useState<WatchlistStock[]>([]);
-  const [newWatchlistName, setNewWatchlistName] = useState("");
+  const [watchlistStocks, setWatchlistStocks] = useState<WatchlistStock[]>([]);
   const [selectedWatchlistForm, setSelectedWatchlistForm] = useState<WatchlistStock>(emptyWatchlistStock);
   const [watchlistStockSearch, setWatchlistStockSearch] = useState("");
   const [watchlistStockSearchResults, setWatchlistStockSearchResults] = useState<StockSearchResult[]>([]);
@@ -278,78 +287,16 @@ function App() {
     }
   }
 
-  async function loadWatchlists(nextSelectedId?: number) {
+  async function loadWatchlist() {
     setIsBusy(true);
     setMessage("");
 
     try {
-      const result = await getWatchlists();
-      setWatchlists(result.watchlists);
-
-      const selectedId = nextSelectedId ?? selectedWatchlistId ?? result.watchlists[0]?.id ?? null;
-      setSelectedWatchlistId(selectedId);
-
-      if (selectedId) {
-        const stocksResult = await getWatchlistStocks(selectedId);
-        setSelectedWatchlistStocks(stocksResult.stocks);
-      } else {
-        setSelectedWatchlistStocks([]);
-      }
+      const result = await getWatchlistStocks();
+      setWatchlistStocks(result.stocks);
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Unable to load watchlists.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleCreateWatchlist(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setIsBusy(true);
-    setMessage("");
-
-    try {
-      const result = await createWatchlist(newWatchlistName.trim());
-      setNewWatchlistName("");
-      setMessageType("success");
-      setMessage("Watchlist created.");
-      await loadWatchlists(result.watchlist.id);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Unable to create watchlist.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleSelectWatchlist(id: number) {
-    setSelectedWatchlistId(id);
-    setIsBusy(true);
-    setMessage("");
-
-    try {
-      const result = await getWatchlistStocks(id);
-      setSelectedWatchlistStocks(result.stocks);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Unable to load watchlist stocks.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleDeleteWatchlist(id: number) {
-    setIsBusy(true);
-    setMessage("");
-
-    try {
-      await deleteWatchlist(id);
-      setMessageType("success");
-      setMessage("Watchlist removed.");
-      await loadWatchlists(selectedWatchlistId === id ? undefined : selectedWatchlistId ?? undefined);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Unable to remove watchlist.");
+      setMessage(error instanceof Error ? error.message : "Unable to load watchlist.");
     } finally {
       setIsBusy(false);
     }
@@ -397,12 +344,6 @@ function App() {
   async function handleSelectedWatchlistSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedWatchlistId) {
-      setMessageType("error");
-      setMessage("Create or select a watchlist first.");
-      return;
-    }
-
     if (!selectedWatchlistForm.symbolToken) {
       setMessageType("error");
       setMessage("Search and select a stock first.");
@@ -413,13 +354,18 @@ function App() {
     setMessage("");
 
     try {
-      await saveStockToWatchlist(selectedWatchlistId, {
+      await saveWatchlistStock({
         ...selectedWatchlistForm,
         purchaseRate: selectedWatchlistForm.purchaseRate ?? null,
-        salesRate: selectedWatchlistForm.salesRate ?? null
+        salesRate: selectedWatchlistForm.salesRate ?? null,
+        theme: selectedWatchlistForm.theme?.trim() || null,
+        sector: selectedWatchlistForm.sector?.trim() || null,
+        industry: selectedWatchlistForm.industry?.trim() || null,
+        classificationReason: selectedWatchlistForm.classificationReason?.trim() || null,
+        confidenceScore: selectedWatchlistForm.confidenceScore ?? null
       });
-      const result = await getWatchlistStocks(selectedWatchlistId);
-      setSelectedWatchlistStocks(result.stocks);
+      const result = await getWatchlistStocks();
+      setWatchlistStocks(result.stocks);
       setSelectedWatchlistForm(emptyWatchlistStock);
       setWatchlistStockSearch("");
       setWatchlistStockSearchResults([]);
@@ -434,7 +380,8 @@ function App() {
   }
 
   async function handleDeleteSelectedWatchlistStock(stock: WatchlistStock) {
-    if (!selectedWatchlistId || !stock.watchlistItemId) {
+    const watchlistId = stock.watchlistId;
+    if (!watchlistId) {
       return;
     }
 
@@ -442,8 +389,8 @@ function App() {
     setMessage("");
 
     try {
-      await deleteStockFromWatchlist(selectedWatchlistId, stock.watchlistItemId);
-      setSelectedWatchlistStocks((current) => current.filter((item) => item.watchlistItemId !== stock.watchlistItemId));
+      await deleteWatchlistStockById(watchlistId);
+      setWatchlistStocks((current) => current.filter((item) => item.watchlistId !== watchlistId));
       setMessageType("success");
       setMessage("Watchlist stock removed.");
     } catch (error) {
@@ -681,9 +628,7 @@ function App() {
     setPrices([]);
     setOrders([]);
     setTotalProfitLoss(0);
-    setWatchlists([]);
-    setSelectedWatchlistId(null);
-    setSelectedWatchlistStocks([]);
+    setWatchlistStocks([]);
     setTradePlans([]);
     setTradePlanForm(emptyTradePlan);
     setPage("dashboard");
@@ -691,7 +636,7 @@ function App() {
 
   function handleRefresh() {
     if (page === "watchlists") {
-      void loadWatchlists();
+      void loadWatchlist();
       return;
     }
 
@@ -725,7 +670,7 @@ function App() {
 
   useEffect(() => {
     if (token && page === "watchlists") {
-      void loadWatchlists();
+      void loadWatchlist();
     }
   }, [token, page]);
 
@@ -870,50 +815,11 @@ function App() {
 
       {page === "watchlists" && (
         <section className="watchlists-page">
-          <div className="watchlists-sidebar">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Watchlists</p>
-                <h2>Lists</h2>
-              </div>
-            </div>
-
-            <form className="watchlist-create-form" onSubmit={handleCreateWatchlist}>
-              <input
-                value={newWatchlistName}
-                onChange={(event) => setNewWatchlistName(event.target.value)}
-                placeholder="New watchlist"
-                required
-              />
-              <button type="submit" disabled={isBusy}>
-                Create
-              </button>
-            </form>
-
-            <div className="watchlist-list">
-              {watchlists.map((watchlist) => (
-                <article className={selectedWatchlistId === watchlist.id ? "active" : ""} key={watchlist.id}>
-                  <button type="button" onClick={() => void handleSelectWatchlist(watchlist.id)}>
-                    {watchlist.name}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => void handleDeleteWatchlist(watchlist.id)}
-                    disabled={isBusy}
-                  >
-                    Remove
-                  </button>
-                </article>
-              ))}
-            </div>
-          </div>
-
           <div className="watchlist-detail">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Stocks</p>
-                <h2>{watchlists.find((watchlist) => watchlist.id === selectedWatchlistId)?.name || "Select a watchlist"}</h2>
+                <p className="eyebrow">Smart Watchlist</p>
+                <h2>Tracked stocks</h2>
               </div>
             </div>
 
@@ -986,6 +892,93 @@ function App() {
               )}
 
               <label>
+                Asset type
+                <select
+                  value={selectedWatchlistForm.assetType || "Unknown"}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      assetType: event.target.value
+                    }))
+                  }
+                >
+                  {stockAssetTypes.map((assetType) => (
+                    <option key={assetType} value={assetType}>
+                      {assetType}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Theme
+                <input
+                  value={selectedWatchlistForm.theme ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      theme: event.target.value
+                    }))
+                  }
+                  placeholder="Banking, Auto, IT"
+                />
+              </label>
+              <label>
+                Sector
+                <input
+                  value={selectedWatchlistForm.sector ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      sector: event.target.value
+                    }))
+                  }
+                  placeholder="Optional"
+                />
+              </label>
+              <label>
+                Industry
+                <input
+                  value={selectedWatchlistForm.industry ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      industry: event.target.value
+                    }))
+                  }
+                  placeholder="Optional"
+                />
+              </label>
+              <label>
+                Confidence
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={selectedWatchlistForm.confidenceScore ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      confidenceScore: event.target.value ? Number(event.target.value) : null
+                    }))
+                  }
+                  placeholder="0-100"
+                />
+              </label>
+              <label>
+                Classification reason
+                <input
+                  value={selectedWatchlistForm.classificationReason ?? ""}
+                  onChange={(event) =>
+                    setSelectedWatchlistForm((current) => ({
+                      ...current,
+                      classificationReason: event.target.value
+                    }))
+                  }
+                  placeholder="Why this asset type?"
+                />
+              </label>
+              <label>
                 Buy at
                 <input
                   type="number"
@@ -1015,19 +1008,27 @@ function App() {
                   placeholder="Optional"
                 />
               </label>
-              <button type="submit" disabled={isBusy || !selectedWatchlistId}>
+              <button type="submit" disabled={isBusy}>
                 Save stock
               </button>
             </form>
 
             <div className="planned-stocks">
-              {selectedWatchlistStocks.map((stock) => (
-                <article key={stock.watchlistItemId || `${stock.exchange}-${stock.symbolToken}`}>
+              {watchlistStocks.map((stock) => (
+                <article key={stock.watchlistId || `${stock.exchange}-${stock.symbolToken}`}>
                   <div>
                     <strong>{stock.tradingSymbol || stock.symbol}</strong>
                     <span>
                       {stock.exchange} · {stock.symbolToken}
                     </span>
+                  </div>
+                  <div>
+                    <span>Type</span>
+                    <strong>{stock.assetType || "Unknown"}</strong>
+                  </div>
+                  <div>
+                    <span>Theme</span>
+                    <strong>{stock.theme || "-"}</strong>
                   </div>
                   <div>
                     <span>Buy</span>

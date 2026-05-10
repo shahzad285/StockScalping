@@ -1,40 +1,14 @@
 using StockTrading.Common.DTOs;
 using StockTrading.IServices;
-using StockTrading.Models;
 using StockTrading.Repository.IRepository;
 
 namespace StockTrading.Services;
 
 public sealed class WatchlistService(IWatchlistRepository watchlistRepository) : IWatchlistService
 {
-    public Task<IReadOnlyList<Watchlist>> GetWatchlistsAsync(CancellationToken cancellationToken = default)
-    {
-        return watchlistRepository.GetWatchlistsAsync(cancellationToken);
-    }
-
-    public Task<Watchlist> CreateWatchlistAsync(string name, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            throw new ArgumentException("Watchlist name is required.");
-        }
-
-        return watchlistRepository.CreateWatchlistAsync(name.Trim(), cancellationToken);
-    }
-
-    public Task DeleteWatchlistAsync(int id, CancellationToken cancellationToken = default)
-    {
-        return watchlistRepository.DeleteWatchlistAsync(id, cancellationToken);
-    }
-
     public Task<IReadOnlyList<WatchlistStock>> GetStocksAsync(CancellationToken cancellationToken = default)
     {
         return watchlistRepository.GetAllAsync(cancellationToken);
-    }
-
-    public Task<IReadOnlyList<WatchlistStock>> GetStocksAsync(int watchlistId, CancellationToken cancellationToken = default)
-    {
-        return watchlistRepository.GetStocksAsync(watchlistId, cancellationToken);
     }
 
     public async Task<WatchlistStock> SaveStockAsync(WatchlistStock stock, CancellationToken cancellationToken = default)
@@ -44,21 +18,14 @@ public sealed class WatchlistService(IWatchlistRepository watchlistRepository) :
         return normalizedStock;
     }
 
-    public async Task<WatchlistStock> SaveStockAsync(int watchlistId, WatchlistStock stock, CancellationToken cancellationToken = default)
-    {
-        var normalizedStock = Normalize(stock);
-        await watchlistRepository.UpsertAsync(watchlistId, normalizedStock, cancellationToken);
-        return normalizedStock;
-    }
-
     public Task DeleteStockAsync(string symbol, CancellationToken cancellationToken = default)
     {
         return watchlistRepository.DeleteAsync(symbol.Trim().ToUpperInvariant(), cancellationToken);
     }
 
-    public Task DeleteStockAsync(int watchlistId, int watchlistItemId, CancellationToken cancellationToken = default)
+    public Task DeleteStockAsync(int watchlistId, CancellationToken cancellationToken = default)
     {
-        return watchlistRepository.DeleteStockAsync(watchlistId, watchlistItemId, cancellationToken);
+        return watchlistRepository.DeleteAsync(watchlistId, cancellationToken);
     }
 
     private static WatchlistStock Normalize(WatchlistStock stock)
@@ -75,6 +42,8 @@ public sealed class WatchlistService(IWatchlistRepository watchlistRepository) :
 
         return new WatchlistStock
         {
+            WatchlistId = stock.WatchlistId,
+            StockId = stock.StockId,
             Symbol = stock.Symbol.Trim().ToUpperInvariant(),
             Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange.Trim().ToUpperInvariant(),
             SymbolToken = stock.SymbolToken.Trim(),
@@ -82,7 +51,13 @@ public sealed class WatchlistService(IWatchlistRepository watchlistRepository) :
                 ? stock.Symbol.Trim().ToUpperInvariant()
                 : stock.TradingSymbol.Trim().ToUpperInvariant(),
             PurchaseRate = stock.PurchaseRate,
-            SalesRate = stock.SalesRate
+            SalesRate = stock.SalesRate,
+            AssetType = string.IsNullOrWhiteSpace(stock.AssetType) ? "Unknown" : stock.AssetType.Trim(),
+            Theme = string.IsNullOrWhiteSpace(stock.Theme) ? null : stock.Theme.Trim(),
+            Sector = string.IsNullOrWhiteSpace(stock.Sector) ? null : stock.Sector.Trim(),
+            Industry = string.IsNullOrWhiteSpace(stock.Industry) ? null : stock.Industry.Trim(),
+            ClassificationReason = string.IsNullOrWhiteSpace(stock.ClassificationReason) ? null : stock.ClassificationReason.Trim(),
+            ConfidenceScore = stock.ConfidenceScore
         };
     }
 }

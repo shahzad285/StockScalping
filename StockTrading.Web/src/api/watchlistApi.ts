@@ -2,7 +2,6 @@ import { apiRequest } from "./apiClient";
 import { StockExchange, StockSearchResult } from "./stockApi";
 
 export type WatchlistStock = {
-  watchlistItemId?: number;
   watchlistId?: number;
   stockId?: number;
   symbol: string;
@@ -11,17 +10,15 @@ export type WatchlistStock = {
   tradingSymbol: string;
   purchaseRate?: number | null;
   salesRate?: number | null;
+  assetType?: string;
+  theme?: string | null;
+  sector?: string | null;
+  industry?: string | null;
+  classificationReason?: string | null;
+  confidenceScore?: number | null;
 };
 
-export type Watchlist = {
-  id: number;
-  name: string;
-  isActive: boolean;
-  createdAtUtc: string;
-  updatedAtUtc?: string | null;
-};
-
-export async function getWatchlist(): Promise<{ stocks: WatchlistStock[] }> {
+export async function getWatchlistStocks(): Promise<{ stocks: WatchlistStock[] }> {
   return apiRequest<{ stocks: WatchlistStock[] }>("/Watchlist/stocks");
 }
 
@@ -50,39 +47,8 @@ export async function deleteWatchlistStock(symbol: string): Promise<void> {
   });
 }
 
-export async function getWatchlists(): Promise<{ watchlists: Watchlist[] }> {
-  return apiRequest<{ watchlists: Watchlist[] }>("/Watchlist");
-}
-
-export async function createWatchlist(name: string): Promise<{ watchlist: Watchlist }> {
-  return apiRequest<{ watchlist: Watchlist }>("/Watchlist", {
-    method: "POST",
-    body: JSON.stringify({ name })
-  });
-}
-
-export async function deleteWatchlist(id: number): Promise<void> {
-  await apiRequest<void>(`/Watchlist/${id}`, {
-    method: "DELETE"
-  });
-}
-
-export async function getWatchlistStocks(watchlistId: number): Promise<{ stocks: WatchlistStock[] }> {
-  return apiRequest<{ stocks: WatchlistStock[] }>(`/Watchlist/${watchlistId}/stocks`);
-}
-
-export async function saveStockToWatchlist(
-  watchlistId: number,
-  stock: WatchlistStock
-): Promise<{ stock: WatchlistStock }> {
-  return apiRequest<{ stock: WatchlistStock }>(`/Watchlist/${watchlistId}/stocks`, {
-    method: "POST",
-    body: JSON.stringify(stock)
-  });
-}
-
-export async function deleteStockFromWatchlist(watchlistId: number, watchlistItemId: number): Promise<void> {
-  await apiRequest<void>(`/Watchlist/${watchlistId}/stocks/${watchlistItemId}`, {
+export async function deleteWatchlistStockById(watchlistId: number): Promise<void> {
+  await apiRequest<void>(`/Watchlist/stocks/by-id/${watchlistId}`, {
     method: "DELETE"
   });
 }
