@@ -1,3 +1,4 @@
+using StockTrading.Common.DTOs;
 using StockTrading.Models;
 
 namespace StockTrading.IServices;

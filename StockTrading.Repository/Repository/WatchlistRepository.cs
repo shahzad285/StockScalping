@@ -1,5 +1,6 @@
 using Dapper;
 using StockTrading.Data;
+using StockTrading.Common.DTOs;
 using StockTrading.Models;
 using StockTrading.Repository.IRepository;
 

@@ -1,3 +1,4 @@
+using StockTrading.Common.DTOs;
 using StockTrading.IServices;
 using StockTrading.Models;
 using StockTrading.Repository.IRepository;

@@ -1,4 +1,4 @@
-namespace StockTrading.Models;
+namespace StockTrading.Common.DTOs;
 
 public class WatchlistStock
 {
