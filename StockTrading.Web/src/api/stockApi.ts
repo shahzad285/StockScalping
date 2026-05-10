@@ -26,10 +26,29 @@ export type StockPrice = {
   message: string;
 };
 
+export type StockExchange = "NSE" | "BSE";
+
+export type StockSearchResult = {
+  symbol: string;
+  tradingSymbol: string;
+  exchange: StockExchange;
+  symbolToken: string;
+  name?: string | null;
+};
+
 export async function getHoldings(): Promise<HoldingsResponse> {
   return apiRequest<HoldingsResponse>("/Stock/holdings");
 }
 
 export async function getPrices(): Promise<{ prices: StockPrice[] }> {
   return apiRequest<{ prices: StockPrice[] }>("/Stock/prices");
+}
+
+export async function searchStocks(query: string, exchange: StockExchange = "NSE"): Promise<{ stocks: StockSearchResult[] }> {
+  const params = new URLSearchParams({
+    query,
+    exchange
+  });
+
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/Stock/search?${params.toString()}`);
 }

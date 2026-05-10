@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import { StockExchange, StockSearchResult } from "./stockApi";
 
 export type WatchlistStock = {
   watchlistItemId?: number;
@@ -22,6 +23,18 @@ export type Watchlist = {
 
 export async function getWatchlist(): Promise<{ stocks: WatchlistStock[] }> {
   return apiRequest<{ stocks: WatchlistStock[] }>("/Watchlist/stocks");
+}
+
+export async function searchWatchlistStocks(
+  query: string,
+  exchange: StockExchange = "NSE"
+): Promise<{ stocks: StockSearchResult[] }> {
+  const params = new URLSearchParams({
+    query,
+    exchange
+  });
+
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/Watchlist/stocks/search?${params.toString()}`);
 }
 
 export async function saveWatchlistStock(stock: WatchlistStock): Promise<{ stock: WatchlistStock }> {

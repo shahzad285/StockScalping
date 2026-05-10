@@ -225,12 +225,86 @@ select {
   gap: 6px;
 }
 
+.stock-search-field {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(220px, 1fr) 120px auto;
+}
+
+.stock-search-field label {
+  display: grid;
+  gap: 6px;
+}
+
+.stock-search-results {
+  border: 1px solid #dce5e8;
+  border-radius: 6px;
+  display: grid;
+  gap: 6px;
+  grid-column: 1 / -1;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.stock-search-results button {
+  background: #f8fafb;
+  border: 1px solid #edf2f4;
+  color: #172026;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  min-height: auto;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.stock-search-results button:hover {
+  border-color: #146c5f;
+}
+
+.stock-search-results span,
+.selected-stock-summary span {
+  color: #577079;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.selected-stock-summary {
+  background: #f8fafb;
+  border: 1px solid #edf2f4;
+  border-radius: 6px;
+  display: grid;
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: 12px;
+}
+
+.selected-stock-summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
 .stock-plan-form button {
   align-self: end;
 }
 
 .trade-plan-form {
   grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.watchlist-detail .stock-plan-form {
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+}
+
+.watchlist-detail .stock-plan-form > button[type="submit"] {
+  min-width: 124px;
+  white-space: nowrap;
 }
 
 .checkbox-field {
@@ -470,8 +544,16 @@ th {
   }
 
   .stock-plan-form button,
+  .stock-search-field,
+  .stock-search-results,
+  .selected-stock-summary,
   .planned-stocks article {
     grid-column: 1 / -1;
+  }
+
+  .stock-search-field,
+  .selected-stock-summary {
+    grid-template-columns: 1fr;
   }
 
   .planned-stocks article {

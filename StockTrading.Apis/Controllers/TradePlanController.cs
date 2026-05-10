@@ -9,10 +9,12 @@ namespace StockTrading.Controllers;
 public class TradePlanController : ControllerBase
 {
     private readonly ITradePlanService _tradePlanService;
+    private readonly IStockService _stockService;
 
-    public TradePlanController(ITradePlanService tradePlanService)
+    public TradePlanController(ITradePlanService tradePlanService, IStockService stockService)
     {
         _tradePlanService = tradePlanService;
+        _stockService = stockService;
     }
 
     [HttpGet]
@@ -20,6 +22,30 @@ public class TradePlanController : ControllerBase
     {
         var tradePlans = await _tradePlanService.GetAllAsync(HttpContext.RequestAborted);
         return Ok(new { tradePlans });
+    }
+
+    [HttpGet("stocks/search")]
+    public async Task<IActionResult> SearchStocks([FromQuery] string query, [FromQuery] StockExchange exchange = StockExchange.NSE)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return BadRequest(new { message = "Search query is required." });
+        }
+
+        if (!Enum.IsDefined(exchange))
+        {
+            return BadRequest(new { message = "Exchange must be NSE or BSE." });
+        }
+
+        try
+        {
+            var stocks = await _stockService.SearchStocksAsync(query, exchange, HttpContext.RequestAborted);
+            return Ok(new { stocks });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "Failed to search stocks", error = ex.Message });
+        }
     }
 
     [HttpPost]

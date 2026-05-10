@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import { StockExchange, StockSearchResult } from "./stockApi";
 
 export type TradePlan = {
   id?: number;
@@ -23,6 +24,18 @@ export type TradePlan = {
 
 export async function getTradePlans(): Promise<{ tradePlans: TradePlan[] }> {
   return apiRequest<{ tradePlans: TradePlan[] }>("/TradePlan");
+}
+
+export async function searchTradePlanStocks(
+  query: string,
+  exchange: StockExchange = "NSE"
+): Promise<{ stocks: StockSearchResult[] }> {
+  const params = new URLSearchParams({
+    query,
+    exchange
+  });
+
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/TradePlan/stocks/search?${params.toString()}`);
 }
 
 export async function saveTradePlan(tradePlan: TradePlan): Promise<{ tradePlan: TradePlan }> {

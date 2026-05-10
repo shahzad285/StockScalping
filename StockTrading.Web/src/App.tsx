@@ -2,15 +2,16 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { clearToken, getToken, setToken } from "./auth/authStorage";
 import { AccountProfile, getProfile, login, LoginMethod, requestLoginOtp, smartApiLogin } from "./api/accountApi";
 import { authExpiredEventName } from "./api/apiClient";
-import { getHoldings, getPrices, HoldingStock, StockPrice } from "./api/stockApi";
+import { getHoldings, getPrices, HoldingStock, StockExchange, StockPrice, StockSearchResult } from "./api/stockApi";
 import { getOrders, OrderDetails } from "./api/orderApi";
-import { deleteTradePlan, getTradePlans, saveTradePlan, TradePlan } from "./api/tradePlanApi";
+import { deleteTradePlan, getTradePlans, saveTradePlan, searchTradePlanStocks, TradePlan } from "./api/tradePlanApi";
 import {
   createWatchlist,
   deleteStockFromWatchlist,
   deleteWatchlist,
   getWatchlists,
   getWatchlistStocks,
+  searchWatchlistStocks,
   saveStockToWatchlist,
   Watchlist,
   WatchlistStock
@@ -71,8 +72,14 @@ function App() {
   const [selectedWatchlistStocks, setSelectedWatchlistStocks] = useState<WatchlistStock[]>([]);
   const [newWatchlistName, setNewWatchlistName] = useState("");
   const [selectedWatchlistForm, setSelectedWatchlistForm] = useState<WatchlistStock>(emptyWatchlistStock);
+  const [watchlistStockSearch, setWatchlistStockSearch] = useState("");
+  const [watchlistStockSearchResults, setWatchlistStockSearchResults] = useState<StockSearchResult[]>([]);
+  const [isWatchlistStockSearching, setIsWatchlistStockSearching] = useState(false);
   const [tradePlans, setTradePlans] = useState<TradePlan[]>([]);
   const [tradePlanForm, setTradePlanForm] = useState<TradePlan>(emptyTradePlan);
+  const [tradePlanStockSearch, setTradePlanStockSearch] = useState("");
+  const [tradePlanStockSearchResults, setTradePlanStockSearchResults] = useState<StockSearchResult[]>([]);
+  const [isTradePlanStockSearching, setIsTradePlanStockSearching] = useState(false);
   const [totalProfitLoss, setTotalProfitLoss] = useState(0);
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
@@ -223,12 +230,57 @@ function App() {
     }
   }
 
+  async function handleWatchlistStockSearch() {
+    const query = watchlistStockSearch.trim() || selectedWatchlistForm.symbol.trim();
+    if (!query) {
+      setMessageType("error");
+      setMessage("Enter a stock to search.");
+      return;
+    }
+
+    setIsWatchlistStockSearching(true);
+    setMessage("");
+
+    try {
+      const result = await searchWatchlistStocks(query, selectedWatchlistForm.exchange as StockExchange);
+      setWatchlistStockSearchResults(result.stocks);
+      if (result.stocks.length === 0) {
+        setMessageType("error");
+        setMessage("No stocks found.");
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to search stocks.");
+    } finally {
+      setIsWatchlistStockSearching(false);
+    }
+  }
+
+  function selectWatchlistStock(stock: StockSearchResult) {
+    setSelectedWatchlistForm((current) => ({
+      ...current,
+      symbol: stock.symbol,
+      exchange: stock.exchange,
+      symbolToken: stock.symbolToken,
+      tradingSymbol: stock.tradingSymbol
+    }));
+    setWatchlistStockSearch(stock.tradingSymbol || stock.symbol);
+    setWatchlistStockSearchResults([]);
+    setMessage("");
+  }
+
   async function handleSelectedWatchlistSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!selectedWatchlistId) {
       setMessageType("error");
       setMessage("Create or select a watchlist first.");
+      return;
+    }
+
+    if (!selectedWatchlistForm.symbolToken) {
+      setMessageType("error");
+      setMessage("Search and select a stock first.");
       return;
     }
 
@@ -244,6 +296,8 @@ function App() {
       const result = await getWatchlistStocks(selectedWatchlistId);
       setSelectedWatchlistStocks(result.stocks);
       setSelectedWatchlistForm(emptyWatchlistStock);
+      setWatchlistStockSearch("");
+      setWatchlistStockSearchResults([]);
       setMessageType("success");
       setMessage("Watchlist stock saved.");
     } catch (error) {
@@ -290,8 +344,54 @@ function App() {
     }
   }
 
+  async function handleTradePlanStockSearch() {
+    const query = tradePlanStockSearch.trim() || tradePlanForm.symbol.trim();
+    if (!query) {
+      setMessageType("error");
+      setMessage("Enter a stock to search.");
+      return;
+    }
+
+    setIsTradePlanStockSearching(true);
+    setMessage("");
+
+    try {
+      const result = await searchTradePlanStocks(query, tradePlanForm.exchange as StockExchange);
+      setTradePlanStockSearchResults(result.stocks);
+      if (result.stocks.length === 0) {
+        setMessageType("error");
+        setMessage("No stocks found.");
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to search stocks.");
+    } finally {
+      setIsTradePlanStockSearching(false);
+    }
+  }
+
+  function selectTradePlanStock(stock: StockSearchResult) {
+    setTradePlanForm((current) => ({
+      ...current,
+      symbol: stock.symbol,
+      exchange: stock.exchange,
+      symbolToken: stock.symbolToken,
+      tradingSymbol: stock.tradingSymbol
+    }));
+    setTradePlanStockSearch(stock.tradingSymbol || stock.symbol);
+    setTradePlanStockSearchResults([]);
+    setMessage("");
+  }
+
   async function handleTradePlanSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!tradePlanForm.symbolToken) {
+      setMessageType("error");
+      setMessage("Search and select a stock first.");
+      return;
+    }
+
     setIsBusy(true);
     setMessage("");
 
@@ -302,6 +402,8 @@ function App() {
         tradingSymbol: tradePlanForm.tradingSymbol || tradePlanForm.symbol
       });
       setTradePlanForm(emptyTradePlan);
+      setTradePlanStockSearch("");
+      setTradePlanStockSearchResults([]);
       setMessageType("success");
       setMessage(tradePlanForm.id ? "Trade plan updated." : "Trade plan created.");
       await loadTradePlans();
@@ -319,6 +421,8 @@ function App() {
       maxBudget: tradePlan.maxBudget ?? null,
       status: tradePlan.status || "Active"
     });
+    setTradePlanStockSearch(tradePlan.tradingSymbol || tradePlan.symbol);
+    setTradePlanStockSearchResults([]);
     setMessage("");
   }
 
@@ -643,41 +747,73 @@ function App() {
             </div>
 
             <form className="stock-plan-form" onSubmit={handleSelectedWatchlistSubmit}>
-              <label>
-                Symbol
-                <input
-                  value={selectedWatchlistForm.symbol}
-                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, symbol: event.target.value }))}
-                  placeholder="RELIANCE"
-                  required
-                />
-              </label>
-              <label>
-                Exchange
-                <input
-                  value={selectedWatchlistForm.exchange}
-                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, exchange: event.target.value }))}
-                  placeholder="NSE"
-                  required
-                />
-              </label>
-              <label>
-                Symbol token
-                <input
-                  value={selectedWatchlistForm.symbolToken}
-                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, symbolToken: event.target.value }))}
-                  placeholder="2885"
-                  required
-                />
-              </label>
-              <label>
-                Trading symbol
-                <input
-                  value={selectedWatchlistForm.tradingSymbol}
-                  onChange={(event) => setSelectedWatchlistForm((current) => ({ ...current, tradingSymbol: event.target.value }))}
-                  placeholder="RELIANCE-EQ"
-                />
-              </label>
+              <div className="stock-search-field">
+                <label>
+                  Search stock
+                  <input
+                    value={watchlistStockSearch}
+                    onChange={(event) => setWatchlistStockSearch(event.target.value)}
+                    placeholder="RELIANCE"
+                  />
+                </label>
+                <label>
+                  Exchange
+                  <select
+                    value={selectedWatchlistForm.exchange}
+                    onChange={(event) => {
+                      setSelectedWatchlistForm((current) => ({
+                        ...current,
+                        exchange: event.target.value,
+                        symbol: "",
+                        symbolToken: "",
+                        tradingSymbol: ""
+                      }));
+                      setWatchlistStockSearchResults([]);
+                    }}
+                  >
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                  </select>
+                </label>
+                <button type="button" onClick={() => void handleWatchlistStockSearch()} disabled={isWatchlistStockSearching}>
+                  {isWatchlistStockSearching ? "Searching..." : "Search"}
+                </button>
+              </div>
+
+              {watchlistStockSearchResults.length > 0 && (
+                <div className="stock-search-results">
+                  {watchlistStockSearchResults.map((stock) => (
+                    <button type="button" key={`${stock.exchange}-${stock.symbolToken}`} onClick={() => selectWatchlistStock(stock)}>
+                      <strong>{stock.tradingSymbol || stock.symbol}</strong>
+                      <span>
+                        {stock.exchange} - {stock.symbolToken}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {selectedWatchlistForm.symbolToken && (
+                <div className="selected-stock-summary">
+                  <div>
+                    <span>Symbol</span>
+                    <strong>{selectedWatchlistForm.symbol}</strong>
+                  </div>
+                  <div>
+                    <span>Trading symbol</span>
+                    <strong>{selectedWatchlistForm.tradingSymbol || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Exchange</span>
+                    <strong>{selectedWatchlistForm.exchange}</strong>
+                  </div>
+                  <div>
+                    <span>Token</span>
+                    <strong>{selectedWatchlistForm.symbolToken}</strong>
+                  </div>
+                </div>
+              )}
+
               <label>
                 Buy at
                 <input
@@ -748,48 +884,88 @@ function App() {
               <h2>{tradePlanForm.id ? "Edit plan" : "New plan"}</h2>
             </div>
             {tradePlanForm.id && (
-              <button type="button" className="secondary" onClick={() => setTradePlanForm(emptyTradePlan)}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setTradePlanForm(emptyTradePlan);
+                  setTradePlanStockSearch("");
+                  setTradePlanStockSearchResults([]);
+                }}
+              >
                 New plan
               </button>
             )}
           </div>
 
           <form className="stock-plan-form trade-plan-form" onSubmit={handleTradePlanSubmit}>
-            <label>
-              Symbol
-              <input
-                value={tradePlanForm.symbol}
-                onChange={(event) => setTradePlanForm((current) => ({ ...current, symbol: event.target.value }))}
-                placeholder="RELIANCE"
-                required
-              />
-            </label>
-            <label>
-              Exchange
-              <input
-                value={tradePlanForm.exchange}
-                onChange={(event) => setTradePlanForm((current) => ({ ...current, exchange: event.target.value }))}
-                placeholder="NSE"
-                required
-              />
-            </label>
-            <label>
-              Symbol token
-              <input
-                value={tradePlanForm.symbolToken}
-                onChange={(event) => setTradePlanForm((current) => ({ ...current, symbolToken: event.target.value }))}
-                placeholder="2885"
-                required
-              />
-            </label>
-            <label>
-              Trading symbol
-              <input
-                value={tradePlanForm.tradingSymbol}
-                onChange={(event) => setTradePlanForm((current) => ({ ...current, tradingSymbol: event.target.value }))}
-                placeholder="RELIANCE-EQ"
-              />
-            </label>
+            <div className="stock-search-field">
+              <label>
+                Search stock
+                <input
+                  value={tradePlanStockSearch}
+                  onChange={(event) => setTradePlanStockSearch(event.target.value)}
+                  placeholder="RELIANCE"
+                />
+              </label>
+              <label>
+                Exchange
+                <select
+                  value={tradePlanForm.exchange}
+                  onChange={(event) => {
+                    setTradePlanForm((current) => ({
+                      ...current,
+                      exchange: event.target.value,
+                      symbol: "",
+                      symbolToken: "",
+                      tradingSymbol: ""
+                    }));
+                    setTradePlanStockSearchResults([]);
+                  }}
+                >
+                  <option value="NSE">NSE</option>
+                  <option value="BSE">BSE</option>
+                </select>
+              </label>
+              <button type="button" onClick={() => void handleTradePlanStockSearch()} disabled={isTradePlanStockSearching}>
+                {isTradePlanStockSearching ? "Searching..." : "Search"}
+              </button>
+            </div>
+
+            {tradePlanStockSearchResults.length > 0 && (
+              <div className="stock-search-results">
+                {tradePlanStockSearchResults.map((stock) => (
+                  <button type="button" key={`${stock.exchange}-${stock.symbolToken}`} onClick={() => selectTradePlanStock(stock)}>
+                    <strong>{stock.tradingSymbol || stock.symbol}</strong>
+                    <span>
+                      {stock.exchange} - {stock.symbolToken}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {tradePlanForm.symbolToken && (
+              <div className="selected-stock-summary">
+                <div>
+                  <span>Symbol</span>
+                  <strong>{tradePlanForm.symbol}</strong>
+                </div>
+                <div>
+                  <span>Trading symbol</span>
+                  <strong>{tradePlanForm.tradingSymbol || "-"}</strong>
+                </div>
+                <div>
+                  <span>Exchange</span>
+                  <strong>{tradePlanForm.exchange}</strong>
+                </div>
+                <div>
+                  <span>Token</span>
+                  <strong>{tradePlanForm.symbolToken}</strong>
+                </div>
+              </div>
+            )}
+
             <label>
               Buy price
               <input

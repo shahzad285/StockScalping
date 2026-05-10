@@ -611,7 +611,8 @@ public class AngelOneService : IBrokerService
                     Name = GetJsonStringProperty(item, "name", "symbolname", "companyName")
                 };
             })
-            .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken))
+            .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken) &&
+                           IsBeSeries(item.TradingSymbol))
             .ToList();
     }
 
@@ -787,6 +788,11 @@ public class AngelOneService : IBrokerService
         return tradingSymbol.EndsWith("-EQ", StringComparison.OrdinalIgnoreCase)
             ? tradingSymbol[..^3]
             : tradingSymbol;
+    }
+
+    private static bool IsBeSeries(string tradingSymbol)
+    {
+        return tradingSymbol.EndsWith("-BE", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int GetJsonInt(JsonElement element)
