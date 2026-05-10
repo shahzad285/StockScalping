@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.Models;
 
 namespace StockTrading.IServices;
@@ -12,15 +13,6 @@ public interface IAccountService
     Task<AccountServiceResult<MeResponse>> MeAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default);
     Task<AccountServiceResult<object>> SmartApiLoginAsync(SmartApiLoginRequest request, CancellationToken cancellationToken = default);
     Task<AccountServiceResult<AccountProfile>> GetProfileAsync(ClaimsPrincipal user, CancellationToken cancellationToken = default);
-}
-
-public enum AccountServiceResultStatus
-{
-    Ok,
-    BadRequest,
-    Unauthorized,
-    Forbidden,
-    ServiceUnavailable
 }
 
 public sealed record AccountServiceResult<T>(

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.IServices;
 
 namespace StockTrading.Controllers;
@@ -120,13 +121,4 @@ public class StockController : ControllerBase
             _ => (to.AddMonths(-1), StockChartInterval.ONE_DAY)
         };
     }
-}
-
-public enum StockChartRange
-{
-    OneDay,
-    OneWeek,
-    OneMonth,
-    SixMonths,
-    OneYear
 }

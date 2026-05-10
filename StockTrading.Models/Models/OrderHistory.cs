@@ -1,3 +1,5 @@
+using StockTrading.Common.Enums;
+
 namespace StockTrading.Models;
 
 public class OrderHistory

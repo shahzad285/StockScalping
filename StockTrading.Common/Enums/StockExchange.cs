@@ -1,4 +1,4 @@
-namespace StockTrading.Common.DTOs;
+namespace StockTrading.Common.Enums;
 
 public enum StockExchange
 {

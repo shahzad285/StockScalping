@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using StockTrading.Common.DTOs;
+using StockTrading.Common.Enums;
 using StockTrading.Common.Settings;
 using StockTrading.IServices;
 using StockTrading.Models;
