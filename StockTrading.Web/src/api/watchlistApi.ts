@@ -8,8 +8,6 @@ export type WatchlistStock = {
   exchange: string;
   symbolToken: string;
   tradingSymbol: string;
-  purchaseRate?: number | null;
-  salesRate?: number | null;
   assetType?: string;
   theme?: string | null;
   sector?: string | null;

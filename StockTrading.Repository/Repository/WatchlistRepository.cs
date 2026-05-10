@@ -19,8 +19,6 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 stocks.exchange as Exchange,
                 stocks.symbol_token as SymbolToken,
                 stocks.trading_symbol as TradingSymbol,
-                watchlist.buy_target_price as PurchaseRate,
-                watchlist.sell_target_price as SalesRate,
                 coalesce(stock_profiles.asset_type, 'Unknown') as AssetType,
                 stock_profiles.theme as Theme,
                 stock_profiles.sector as Sector,
@@ -98,22 +96,16 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
             )
             insert into watchlist (
                 stock_id,
-                buy_target_price,
-                sell_target_price,
                 is_active,
                 created_at_utc
             )
             select
                 saved_profile.stock_id,
-                @PurchaseRate,
-                @SalesRate,
                 true,
                 now()
             from saved_profile
             on conflict (stock_id) do update
-            set buy_target_price = excluded.buy_target_price,
-                sell_target_price = excluded.sell_target_price,
-                is_active = true,
+            set is_active = true,
                 updated_at_utc = now()
             """,
             new
@@ -122,8 +114,6 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 stock.Exchange,
                 stock.SymbolToken,
                 stock.TradingSymbol,
-                stock.PurchaseRate,
-                stock.SalesRate,
                 stock.AssetType,
                 stock.Theme,
                 stock.Sector,

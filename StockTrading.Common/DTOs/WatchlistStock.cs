@@ -8,8 +8,6 @@ public class WatchlistStock
     public string Exchange { get; set; } = "NSE";
     public string SymbolToken { get; set; } = "";
     public string TradingSymbol { get; set; } = "";
-    public decimal? PurchaseRate { get; set; }
-    public decimal? SalesRate { get; set; }
     public string AssetType { get; set; } = "Unknown";
     public string? Theme { get; set; }
     public string? Sector { get; set; }

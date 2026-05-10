@@ -39,8 +39,6 @@ const emptyWatchlistStock: WatchlistStock = {
   exchange: "NSE",
   symbolToken: "",
   tradingSymbol: "",
-  purchaseRate: null,
-  salesRate: null,
   assetType: "Unknown",
   theme: "",
   sector: "",
@@ -48,16 +46,6 @@ const emptyWatchlistStock: WatchlistStock = {
   classificationReason: "",
   confidenceScore: null
 };
-
-const stockAssetTypes = [
-  "Unknown",
-  "SlowGrower",
-  "Stalwart",
-  "FastGrower",
-  "Cyclical",
-  "Turnaround",
-  "AssetPlay"
-];
 
 const emptyTradePlan: TradePlan = {
   buyPrice: 0,
@@ -356,8 +344,7 @@ function App() {
     try {
       await saveWatchlistStock({
         ...selectedWatchlistForm,
-        purchaseRate: selectedWatchlistForm.purchaseRate ?? null,
-        salesRate: selectedWatchlistForm.salesRate ?? null,
+        assetType: "Unknown",
         theme: selectedWatchlistForm.theme?.trim() || null,
         sector: selectedWatchlistForm.sector?.trim() || null,
         industry: selectedWatchlistForm.industry?.trim() || null,
@@ -892,24 +879,6 @@ function App() {
               )}
 
               <label>
-                Asset type
-                <select
-                  value={selectedWatchlistForm.assetType || "Unknown"}
-                  onChange={(event) =>
-                    setSelectedWatchlistForm((current) => ({
-                      ...current,
-                      assetType: event.target.value
-                    }))
-                  }
-                >
-                  {stockAssetTypes.map((assetType) => (
-                    <option key={assetType} value={assetType}>
-                      {assetType}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
                 Theme
                 <input
                   value={selectedWatchlistForm.theme ?? ""}
@@ -978,36 +947,6 @@ function App() {
                   placeholder="Why this asset type?"
                 />
               </label>
-              <label>
-                Buy at
-                <input
-                  type="number"
-                  step="0.05"
-                  value={selectedWatchlistForm.purchaseRate ?? ""}
-                  onChange={(event) =>
-                    setSelectedWatchlistForm((current) => ({
-                      ...current,
-                      purchaseRate: event.target.value ? Number(event.target.value) : null
-                    }))
-                  }
-                  placeholder="Optional"
-                />
-              </label>
-              <label>
-                Sell at
-                <input
-                  type="number"
-                  step="0.05"
-                  value={selectedWatchlistForm.salesRate ?? ""}
-                  onChange={(event) =>
-                    setSelectedWatchlistForm((current) => ({
-                      ...current,
-                      salesRate: event.target.value ? Number(event.target.value) : null
-                    }))
-                  }
-                  placeholder="Optional"
-                />
-              </label>
               <button type="submit" disabled={isBusy}>
                 Save stock
               </button>
@@ -1029,14 +968,6 @@ function App() {
                   <div>
                     <span>Theme</span>
                     <strong>{stock.theme || "-"}</strong>
-                  </div>
-                  <div>
-                    <span>Buy</span>
-                    <strong>{stock.purchaseRate != null ? formatMoney(stock.purchaseRate) : "-"}</strong>
-                  </div>
-                  <div>
-                    <span>Sell</span>
-                    <strong>{stock.salesRate != null ? formatMoney(stock.salesRate) : "-"}</strong>
                   </div>
                   <div className="row-actions">
                     <button type="button" onClick={() => openStockChart(stock)} disabled={isBusy || !stock.symbolToken}>

@@ -50,8 +50,6 @@ public sealed class WatchlistService(IWatchlistRepository watchlistRepository) :
             TradingSymbol = string.IsNullOrWhiteSpace(stock.TradingSymbol)
                 ? stock.Symbol.Trim().ToUpperInvariant()
                 : stock.TradingSymbol.Trim().ToUpperInvariant(),
-            PurchaseRate = stock.PurchaseRate,
-            SalesRate = stock.SalesRate,
             AssetType = string.IsNullOrWhiteSpace(stock.AssetType) ? "Unknown" : stock.AssetType.Trim(),
             Theme = string.IsNullOrWhiteSpace(stock.Theme) ? null : stock.Theme.Trim(),
             Sector = string.IsNullOrWhiteSpace(stock.Sector) ? null : stock.Sector.Trim(),
