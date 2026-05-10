@@ -8,6 +8,7 @@ public interface IBrokerService
     Task<bool> LoginAsync(string? otp = null);
     Task<AccountProfile?> GetProfileAsync();
     Task<HoldingsResponse> GetHoldingsAsync();
+    Task<List<StockSearchResult>> SearchStocksAsync(string query, StockExchange exchange = StockExchange.NSE);
     Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks);
     Task<List<OrderDetails>> GetOrdersAsync();
     Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request);

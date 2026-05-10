@@ -550,6 +550,69 @@ public class AngelOneService : IBrokerService
         public string TradingSymbol { get; set; } = "";
         public string Exchange { get; set; } = "";
         public string SymbolToken { get; set; } = "";
+        public string? Name { get; set; }
+    }
+
+    private async Task<List<ScripInstrument>> SearchScripInstrumentsAsync(string query, string exchange)
+    {
+        var searchText = query?.Trim() ?? "";
+        var exchangeCode = string.IsNullOrWhiteSpace(exchange) ? "NSE" : exchange.Trim().ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            return new List<ScripInstrument>();
+        }
+
+        if (!await EnsureJwtToken())
+        {
+            return new List<ScripInstrument>();
+        }
+
+        SetDefaultHeaders(_jwtToken);
+
+        var searchRequest = new
+        {
+            exchange = exchangeCode,
+            searchscrip = searchText
+        };
+
+        var response = await _httpClient.PostAsJsonAsync(
+            "/rest/secure/angelbroking/order/v1/searchScrip",
+            searchRequest);
+        var content = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            System.Console.WriteLine($"Failed to search scrip {searchText}: {response.StatusCode}");
+            System.Console.WriteLine($"Search Scrip Response Body: {content}");
+            return new List<ScripInstrument>();
+        }
+
+        using var jsonDoc = JsonDocument.Parse(content);
+        var root = jsonDoc.RootElement;
+
+        if (!root.TryGetProperty("data", out var dataElement) ||
+            dataElement.ValueKind != JsonValueKind.Array)
+        {
+            return new List<ScripInstrument>();
+        }
+
+        return dataElement.EnumerateArray()
+            .Select(item =>
+            {
+                var tradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "tradingSymbol", "symbol");
+
+                return new ScripInstrument
+                {
+                    Symbol = GetDisplaySymbol(tradingSymbol, searchText),
+                    Exchange = GetJsonStringProperty(item, "exchange"),
+                    TradingSymbol = tradingSymbol,
+                    SymbolToken = GetJsonStringProperty(item, "symboltoken", "symbolToken"),
+                    Name = GetJsonStringProperty(item, "name", "symbolname", "companyName")
+                };
+            })
+            .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken))
+            .ToList();
     }
 
     private async Task<ScripInstrument?> ResolveInstrument(WatchlistStock stock)
@@ -586,45 +649,7 @@ public class AngelOneService : IBrokerService
             }
         }
 
-        SetDefaultHeaders(_jwtToken);
-
-        var searchRequest = new
-        {
-            exchange = exchange,
-            searchscrip = symbol
-        };
-
-        var response = await _httpClient.PostAsJsonAsync(
-            "/rest/secure/angelbroking/order/v1/searchScrip",
-            searchRequest);
-        var content = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
-        {
-            System.Console.WriteLine($"Failed to resolve scrip {symbol}: {response.StatusCode}");
-            System.Console.WriteLine($"Search Scrip Response Body: {content}");
-            return null;
-        }
-
-        using var jsonDoc = JsonDocument.Parse(content);
-        var root = jsonDoc.RootElement;
-
-        if (!root.TryGetProperty("data", out var dataElement) ||
-            dataElement.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        var candidates = dataElement.EnumerateArray()
-            .Select(item => new ScripInstrument
-            {
-                Symbol = symbol,
-                Exchange = GetJsonStringProperty(item, "exchange"),
-                TradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "tradingSymbol", "symbol"),
-                SymbolToken = GetJsonStringProperty(item, "symboltoken", "symbolToken")
-            })
-            .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken))
-            .ToList();
+        var candidates = await SearchScripInstrumentsAsync(symbol, exchange);
 
         var selected = candidates.FirstOrDefault(item =>
                            string.Equals(item.TradingSymbol, symbol, StringComparison.OrdinalIgnoreCase)) ??
@@ -750,6 +775,18 @@ public class AngelOneService : IBrokerService
             JsonValueKind.Number => element.GetRawText(),
             _ => ""
         };
+    }
+
+    private static string GetDisplaySymbol(string tradingSymbol, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(tradingSymbol))
+        {
+            return fallback;
+        }
+
+        return tradingSymbol.EndsWith("-EQ", StringComparison.OrdinalIgnoreCase)
+            ? tradingSymbol[..^3]
+            : tradingSymbol;
     }
 
     private static int GetJsonInt(JsonElement element)
@@ -1111,6 +1148,20 @@ public class AngelOneService : IBrokerService
     public Task<HoldingsResponse> GetHoldingsAsync()
     {
         return GetHoldingStocks();
+    }
+
+    public async Task<List<StockSearchResult>> SearchStocksAsync(string query, StockExchange exchange = StockExchange.NSE)
+    {
+        var instruments = await SearchScripInstrumentsAsync(query, exchange.ToString());
+
+        return instruments.Select(instrument => new StockSearchResult
+        {
+            Symbol = instrument.Symbol,
+            TradingSymbol = instrument.TradingSymbol,
+            Exchange = instrument.Exchange,
+            SymbolToken = instrument.SymbolToken,
+            Name = instrument.Name
+        }).ToList();
     }
 
     public Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks)

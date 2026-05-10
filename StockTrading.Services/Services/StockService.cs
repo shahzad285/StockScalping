@@ -14,6 +14,14 @@ public sealed class StockService(
         return brokerService.GetHoldingsAsync();
     }
 
+    public Task<List<StockSearchResult>> SearchStocksAsync(
+        string query,
+        StockExchange exchange = StockExchange.NSE,
+        CancellationToken cancellationToken = default)
+    {
+        return brokerService.SearchStocksAsync(query, exchange);
+    }
+
     public async Task<List<StockPrice>> GetConfiguredPricesAsync(CancellationToken cancellationToken = default)
     {
         var stocks = await watchlistRepository.GetAllAsync(cancellationToken);
