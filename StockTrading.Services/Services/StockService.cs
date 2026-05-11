@@ -46,4 +46,10 @@ public sealed class StockService(
     {
         return brokerService.GetPricesAsync(stocks);
     }
+
+    public async Task<List<StockPrice>> RefreshConfiguredPricesAsync(CancellationToken cancellationToken = default)
+    {
+        var stocks = await watchlistRepository.GetAllAsync(cancellationToken);
+        return await brokerService.GetPricesAsync(stocks);
+    }
 }

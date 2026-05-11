@@ -19,4 +19,5 @@ public interface IStockService
         CancellationToken cancellationToken = default);
     Task<List<StockPrice>> GetConfiguredPricesAsync(CancellationToken cancellationToken = default);
     Task<List<StockPrice>> GetPricesAsync(IEnumerable<WatchlistStock> stocks, CancellationToken cancellationToken = default);
+    Task<List<StockPrice>> RefreshConfiguredPricesAsync(CancellationToken cancellationToken = default);
 }

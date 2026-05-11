@@ -77,6 +77,11 @@ public class AngelOneService : IBrokerService
         {
             await LoadBrokerSession();
 
+            if (!string.IsNullOrWhiteSpace(totp))
+            {
+                return await LoginWithTotp(totp);
+            }
+
             // Step 1: Get JWT token from refresh token, or login with MPIN + TOTP.
             if (string.IsNullOrEmpty(_jwtToken))
             {
@@ -120,10 +125,10 @@ public class AngelOneService : IBrokerService
 
             if (!response.IsSuccessStatusCode)
             {
-                if (!string.IsNullOrEmpty(totp))
+                if (!string.IsNullOrWhiteSpace(_refreshToken))
                 {
-                    System.Console.WriteLine("Saved JWT failed. Trying MPIN + TOTP login.");
-                    if (await LoginWithTotp(totp))
+                    System.Console.WriteLine("Saved JWT failed. Trying refresh token.");
+                    if (await GenerateToken())
                     {
                         SetDefaultHeaders(_jwtToken);
                         response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
@@ -161,10 +166,10 @@ public class AngelOneService : IBrokerService
                 }
                 else
                 {
-                    if (!string.IsNullOrEmpty(totp))
+                    if (!string.IsNullOrWhiteSpace(_refreshToken))
                     {
-                        System.Console.WriteLine("Saved JWT profile check failed. Trying MPIN + TOTP login.");
-                        if (await LoginWithTotp(totp))
+                        System.Console.WriteLine("Saved JWT profile check failed. Trying refresh token.");
+                        if (await GenerateToken())
                         {
                             SetDefaultHeaders(_jwtToken);
                             response = await _httpClient.GetAsync("/rest/secure/angelbroking/user/v1/getProfile");
@@ -495,6 +500,20 @@ public class AngelOneService : IBrokerService
             return prices;
         }
 
+        await LoadBrokerSession();
+        if (string.IsNullOrWhiteSpace(_jwtToken) && string.IsNullOrWhiteSpace(_refreshToken))
+        {
+            return stockList.Select(stock => new StockPrice
+            {
+                Symbol = stock.Symbol,
+                TradingSymbol = stock.TradingSymbol,
+                Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange,
+                SymbolToken = stock.SymbolToken,
+                IsFetched = false,
+                Message = "Angel One refresh token is unavailable. Login first."
+            }).ToList();
+        }
+
         if (!await EnsureJwtToken())
         {
             return stockList.Select(stock => new StockPrice
@@ -504,7 +523,7 @@ public class AngelOneService : IBrokerService
                 Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? "NSE" : stock.Exchange,
                 SymbolToken = stock.SymbolToken,
                 IsFetched = false,
-                Message = "JWT token is unavailable. Login first."
+                Message = "Angel One JWT token is unavailable. Login first."
             }).ToList();
         }
 
@@ -724,6 +743,19 @@ public class AngelOneService : IBrokerService
             return prices;
         }
 
+        if (dataElement.ValueKind != JsonValueKind.Object)
+        {
+            var message = GetJsonString(dataElement);
+            foreach (var price in prices)
+            {
+                price.Message = string.IsNullOrWhiteSpace(message)
+                    ? "Quote API returned an unexpected data format."
+                    : message;
+            }
+
+            return prices;
+        }
+
         if (dataElement.TryGetProperty("fetched", out var fetchedElement) &&
             fetchedElement.ValueKind == JsonValueKind.Array)
         {
@@ -838,6 +870,11 @@ public class AngelOneService : IBrokerService
 
     private static decimal GetJsonDecimalProperty(JsonElement element, params string[] propertyNames)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return 0m;
+        }
+
         foreach (var propertyName in propertyNames)
         {
             if (element.TryGetProperty(propertyName, out var value))
@@ -851,6 +888,11 @@ public class AngelOneService : IBrokerService
 
     private static string GetJsonStringProperty(JsonElement element, params string[] propertyNames)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return "";
+        }
+
         foreach (var propertyName in propertyNames)
         {
             if (element.TryGetProperty(propertyName, out var value))
@@ -940,6 +982,11 @@ public class AngelOneService : IBrokerService
 
     private static int GetJsonIntProperty(JsonElement element, params string[] propertyNames)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return 0;
+        }
+
         foreach (var propertyName in propertyNames)
         {
             if (element.TryGetProperty(propertyName, out var value))

@@ -184,7 +184,7 @@ public sealed class AccountService(
         var isConnected = await brokerService.LoginAsync(request.Totp);
         return isConnected
             ? AccountServiceResult<object>.Ok(new { message = "Broker login successful" })
-            : AccountServiceResult<object>.Unauthorized("Broker login failed");
+            : AccountServiceResult<object>.BadRequest("Broker login failed");
     }
 
     public async Task<AccountServiceResult<AccountProfile>> GetProfileAsync(

@@ -53,6 +53,9 @@ builder.Services.Configure<EmailOtpSettings>(builder.Configuration.GetSection("A
 builder.Services.Configure<BrevoSettings>(builder.Configuration.GetSection("Auth:Otp:Email:Brevo"));
 builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("Auth:Otp:Email:SendGrid"));
 builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Auth:Otp:Mobile:Twilio"));
+builder.Services.Configure<StockPollingSettings>(builder.Configuration.GetSection("StockPolling"));
+builder.Services.Configure<FundamentalsPollingSettings>(builder.Configuration.GetSection("FundamentalsPolling"));
+builder.Services.Configure<AlphaVantageSettings>(builder.Configuration.GetSection("AlphaVantage"));
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -95,6 +98,7 @@ builder.Services.AddScoped<IApplicationRoleRepository, ApplicationRoleRepository
 builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>();
 builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
 builder.Services.AddScoped<ITradePlanRepository, TradePlanRepository>();
+builder.Services.AddScoped<IStockProfileRepository, StockProfileRepository>();
 builder.Services.AddScoped<IBrokerSessionRepository, BrokerSessionRepository>();
 builder.Services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
 builder.Services.AddHttpClient<SendGridEmailOtpSender>(client =>
@@ -125,8 +129,16 @@ builder.Services.AddScoped<IStockService, StockService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 builder.Services.AddScoped<ITradePlanService, TradePlanService>();
+builder.Services.AddScoped<IStockFundamentalsService, StockFundamentalsService>();
+builder.Services.AddHostedService<StockPricePollingWorker>();
+builder.Services.AddHostedService<StockFundamentalsPollingWorker>();
 builder.Services.AddScoped<IStringEncryptionService, AesStringEncryptionService>();
 builder.Services.AddScoped<IBrokerSessionStore, BrokerSessionStore>();
+builder.Services.AddHttpClient<IAlphaVantageFundamentalsService, AlphaVantageFundamentalsService>((serviceProvider, client) =>
+{
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AlphaVantageSettings>>().Value;
+    client.BaseAddress = new Uri(settings.BaseUrl);
+});
 builder.Services.AddHttpClient<AngelOneService>();
 builder.Services.AddScoped<IBrokerService>(serviceProvider =>
 {
