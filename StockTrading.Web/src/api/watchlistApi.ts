@@ -5,6 +5,7 @@ export type WatchlistStock = {
   watchlistId?: number;
   stockId?: number;
   symbol: string;
+  name?: string | null;
   exchange: string;
   symbolToken: string;
   tradingSymbol: string;

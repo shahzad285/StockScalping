@@ -16,6 +16,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 watchlist.id as WatchlistId,
                 stocks.id as StockId,
                 stocks.symbol as Symbol,
+                stocks.name as Name,
                 stocks.exchange as Exchange,
                 stocks.symbol_token as SymbolToken,
                 stocks.trading_symbol as TradingSymbol,
@@ -45,6 +46,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
             with saved_stock as (
                 insert into stocks (
                     symbol,
+                    name,
                     exchange,
                     symbol_token,
                     trading_symbol,
@@ -52,6 +54,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 )
                 values (
                     @Symbol,
+                    @Name,
                     @Exchange,
                     @SymbolToken,
                     @TradingSymbol,
@@ -59,6 +62,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 )
                 on conflict (exchange, symbol_token) do update
                 set symbol = excluded.symbol,
+                    name = coalesce(excluded.name, stocks.name),
                     trading_symbol = excluded.trading_symbol,
                     updated_at_utc = now()
                 returning id
@@ -111,6 +115,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
             new
             {
                 stock.Symbol,
+                stock.Name,
                 stock.Exchange,
                 stock.SymbolToken,
                 stock.TradingSymbol,

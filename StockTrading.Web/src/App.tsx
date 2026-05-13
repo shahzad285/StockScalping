@@ -36,6 +36,7 @@ const chartRanges: { label: string; value: StockChartRange }[] = [
 
 const emptyWatchlistStock: WatchlistStock = {
   symbol: "",
+  name: null,
   exchange: "NSE",
   symbolToken: "",
   tradingSymbol: "",
@@ -56,6 +57,7 @@ const emptyTradePlan: TradePlan = {
   isActive: true,
   repeatEnabled: true,
   symbol: "",
+  name: null,
   exchange: "NSE",
   symbolToken: "",
   tradingSymbol: ""
@@ -322,6 +324,7 @@ function App() {
     setSelectedWatchlistForm((current) => ({
       ...current,
       symbol: stock.symbol,
+      name: stock.name ?? null,
       exchange: stock.exchange,
       symbolToken: stock.symbolToken,
       tradingSymbol: stock.tradingSymbol
@@ -489,6 +492,7 @@ function App() {
     setTradePlanForm((current) => ({
       ...current,
       symbol: stock.symbol,
+      name: stock.name ?? null,
       exchange: stock.exchange,
       symbolToken: stock.symbolToken,
       tradingSymbol: stock.tradingSymbol

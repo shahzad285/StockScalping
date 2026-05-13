@@ -17,6 +17,7 @@ export type TradePlan = {
   lastBuyTriggeredAtUtc?: string | null;
   lastSellTriggeredAtUtc?: string | null;
   symbol: string;
+  name?: string | null;
   exchange: string;
   symbolToken: string;
   tradingSymbol: string;

@@ -63,6 +63,7 @@ public sealed class TradePlanService(ITradePlanRepository tradePlanRepository) :
             IsActive = tradePlan.IsActive,
             RepeatEnabled = tradePlan.RepeatEnabled,
             Symbol = tradePlan.Symbol.Trim().ToUpperInvariant(),
+            Name = GetStockName(tradePlan.Name, tradePlan.Symbol, tradePlan.TradingSymbol),
             Exchange = string.IsNullOrWhiteSpace(tradePlan.Exchange)
                 ? "NSE"
                 : tradePlan.Exchange.Trim().ToUpperInvariant(),
@@ -71,5 +72,30 @@ public sealed class TradePlanService(ITradePlanRepository tradePlanRepository) :
                 ? tradePlan.Symbol.Trim().ToUpperInvariant()
                 : tradePlan.TradingSymbol.Trim().ToUpperInvariant()
         };
+    }
+
+    private static string GetStockName(string? name, string symbol, string tradingSymbol)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        var fallback = string.IsNullOrWhiteSpace(symbol) ? tradingSymbol : symbol;
+        return GetDisplayName(fallback);
+    }
+
+    private static string GetDisplayName(string value)
+    {
+        var name = value.Trim().ToUpperInvariant();
+        foreach (var suffix in new[] { "-EQ", "-BE" })
+        {
+            if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
+                return name[..^suffix.Length];
+            }
+        }
+
+        return name;
     }
 }

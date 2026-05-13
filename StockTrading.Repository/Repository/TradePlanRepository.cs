@@ -30,6 +30,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 trade_plans.created_at_utc as CreatedAtUtc,
                 trade_plans.updated_at_utc as UpdatedAtUtc,
                 stocks.symbol as Symbol,
+                stocks.name as Name,
                 stocks.exchange as Exchange,
                 stocks.symbol_token as SymbolToken,
                 stocks.trading_symbol as TradingSymbol
@@ -55,6 +56,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             with saved_stock as (
                 insert into stocks (
                     symbol,
+                    name,
                     exchange,
                     symbol_token,
                     trading_symbol,
@@ -62,6 +64,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 )
                 values (
                     @Symbol,
+                    @Name,
                     @Exchange,
                     @SymbolToken,
                     @TradingSymbol,
@@ -69,6 +72,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 )
                 on conflict (exchange, symbol_token) do update
                 set symbol = excluded.symbol,
+                    name = coalesce(excluded.name, stocks.name),
                     trading_symbol = excluded.trading_symbol,
                     updated_at_utc = now()
                 returning id
@@ -118,6 +122,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 saved_trade_plan.created_at_utc as CreatedAtUtc,
                 saved_trade_plan.updated_at_utc as UpdatedAtUtc,
                 stocks.symbol as Symbol,
+                stocks.name as Name,
                 stocks.exchange as Exchange,
                 stocks.symbol_token as SymbolToken,
                 stocks.trading_symbol as TradingSymbol
@@ -138,6 +143,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
             with saved_stock as (
                 insert into stocks (
                     symbol,
+                    name,
                     exchange,
                     symbol_token,
                     trading_symbol,
@@ -145,6 +151,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 )
                 values (
                     @Symbol,
+                    @Name,
                     @Exchange,
                     @SymbolToken,
                     @TradingSymbol,
@@ -152,6 +159,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 )
                 on conflict (exchange, symbol_token) do update
                 set symbol = excluded.symbol,
+                    name = coalesce(excluded.name, stocks.name),
                     trading_symbol = excluded.trading_symbol,
                     updated_at_utc = now()
                 returning id
@@ -190,6 +198,7 @@ public sealed class TradePlanRepository(IDbConnectionFactory connectionFactory) 
                 saved_trade_plan.created_at_utc as CreatedAtUtc,
                 saved_trade_plan.updated_at_utc as UpdatedAtUtc,
                 stocks.symbol as Symbol,
+                stocks.name as Name,
                 stocks.exchange as Exchange,
                 stocks.symbol_token as SymbolToken,
                 stocks.trading_symbol as TradingSymbol

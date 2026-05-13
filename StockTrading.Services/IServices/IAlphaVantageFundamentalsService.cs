@@ -5,4 +5,5 @@ namespace StockTrading.IServices;
 public interface IAlphaVantageFundamentalsService
 {
     Task<AlphaVantageCompanyOverview?> GetCompanyOverviewAsync(string symbol, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AlphaVantageSymbolSearchMatch>> SearchSymbolsAsync(string keywords, CancellationToken cancellationToken = default);
 }

@@ -56,6 +56,7 @@ builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Aut
 builder.Services.Configure<StockPollingSettings>(builder.Configuration.GetSection("StockPolling"));
 builder.Services.Configure<FundamentalsPollingSettings>(builder.Configuration.GetSection("FundamentalsPolling"));
 builder.Services.Configure<AlphaVantageSettings>(builder.Configuration.GetSection("AlphaVantage"));
+builder.Services.Configure<FinnhubSettings>(builder.Configuration.GetSection("Finnhub"));
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -137,6 +138,11 @@ builder.Services.AddScoped<IBrokerSessionStore, BrokerSessionStore>();
 builder.Services.AddHttpClient<IAlphaVantageFundamentalsService, AlphaVantageFundamentalsService>((serviceProvider, client) =>
 {
     var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AlphaVantageSettings>>().Value;
+    client.BaseAddress = new Uri(settings.BaseUrl);
+});
+builder.Services.AddHttpClient<IFinnhubFundamentalsService, FinnhubFundamentalsService>((serviceProvider, client) =>
+{
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<FinnhubSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
 });
 builder.Services.AddHttpClient<AngelOneService>();

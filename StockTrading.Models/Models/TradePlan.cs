@@ -20,6 +20,7 @@ public class TradePlan
     public DateTime? UpdatedAtUtc { get; set; }
 
     public string Symbol { get; set; } = "";
+    public string? Name { get; set; }
     public string Exchange { get; set; } = "NSE";
     public string SymbolToken { get; set; } = "";
     public string TradingSymbol { get; set; } = "";

@@ -43,10 +43,11 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             )
               and (
                   stock_profiles.id is null
-                  or nullif(trim(stock_profiles.sector), '') is null
-                  or nullif(trim(stock_profiles.industry), '') is null
+                  or (
+                      nullif(trim(stock_profiles.sector), '') is null
+                      and nullif(trim(stock_profiles.industry), '') is null
+                  )
                   or stock_profiles.market_cap is null
-                  or stock_profiles.pe_ratio is null
                   or stock_profiles.last_analyzed_at_utc is null
               )
             order by stocks.symbol
@@ -65,6 +66,11 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await connection.ExecuteAsync(
             """
+            update stocks
+            set name = coalesce(@Name, stocks.name),
+                updated_at_utc = case when @Name is null then updated_at_utc else now() end
+            where id = @StockId;
+
             insert into stock_profiles (
                 stock_id,
                 asset_type,
@@ -105,6 +111,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             new
             {
                 StockId = stock.Id,
+                Name = ToDbValue(overview.Name),
                 AssetType = "Equity",
                 Sector = ToDbValue(overview.Sector),
                 Industry = ToDbValue(overview.Industry),
@@ -121,5 +128,50 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
         return string.IsNullOrWhiteSpace(value) || value.Equals("None", StringComparison.OrdinalIgnoreCase)
             ? null
             : value.Trim();
+    }
+
+    public async Task UpsertFundamentalsAsync(
+        Stock stock,
+        FinnhubCompanyProfile profile,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await connection.ExecuteAsync(
+            """
+            update stocks
+            set name = coalesce(@Name, stocks.name),
+                updated_at_utc = case when @Name is null then updated_at_utc else now() end
+            where id = @StockId;
+
+            insert into stock_profiles (
+                stock_id,
+                asset_type,
+                industry,
+                market_cap,
+                last_analyzed_at_utc,
+                created_at_utc
+            )
+            values (
+                @StockId,
+                @AssetType,
+                @Industry,
+                @MarketCap,
+                now(),
+                now()
+            )
+            on conflict (stock_id) do update
+            set industry = coalesce(excluded.industry, stock_profiles.industry),
+                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
+                last_analyzed_at_utc = now(),
+                updated_at_utc = now()
+            """,
+            new
+            {
+                StockId = stock.Id,
+                Name = ToDbValue(profile.Name),
+                AssetType = "Equity",
+                Industry = ToDbValue(profile.FinnhubIndustry),
+                MarketCap = profile.MarketCapitalization
+            });
     }
 }

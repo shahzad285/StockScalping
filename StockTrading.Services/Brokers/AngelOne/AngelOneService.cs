@@ -621,14 +621,16 @@ public class AngelOneService : IBrokerService
             .Select(item =>
             {
                 var tradingSymbol = GetJsonStringProperty(item, "tradingsymbol", "tradingSymbol", "symbol");
+                var displaySymbol = GetDisplaySymbol(tradingSymbol, searchText);
+                var name = GetJsonStringProperty(item, "name", "symbolname", "companyName");
 
                 return new ScripInstrument
                 {
-                    Symbol = GetDisplaySymbol(tradingSymbol, searchText),
+                    Symbol = displaySymbol,
                     Exchange = GetJsonStringProperty(item, "exchange"),
                     TradingSymbol = tradingSymbol,
                     SymbolToken = GetJsonStringProperty(item, "symboltoken", "symbolToken"),
-                    Name = GetJsonStringProperty(item, "name", "symbolname", "companyName")
+                    Name = string.IsNullOrWhiteSpace(name) ? GetDisplaySymbol(displaySymbol, searchText) : name
                 };
             })
             .Where(item => !string.IsNullOrWhiteSpace(item.SymbolToken) &&
@@ -820,7 +822,9 @@ public class AngelOneService : IBrokerService
 
         return tradingSymbol.EndsWith("-EQ", StringComparison.OrdinalIgnoreCase)
             ? tradingSymbol[..^3]
-            : tradingSymbol;
+            : tradingSymbol.EndsWith("-BE", StringComparison.OrdinalIgnoreCase)
+                ? tradingSymbol[..^3]
+                : tradingSymbol;
     }
 
     private static bool IsBeSeries(string tradingSymbol)
@@ -1256,6 +1260,11 @@ public class AngelOneService : IBrokerService
     public async Task<List<StockSearchResult>> SearchStocksAsync(string query, StockExchange exchange = StockExchange.NSE)
     {
         var instruments = await SearchScripInstrumentsAsync(query, exchange.ToString());
+        foreach (var instrument in instruments)
+        {
+            System.Console.WriteLine(
+                $"Search result {instrument.Exchange} {instrument.Symbol} {instrument.TradingSymbol} token {instrument.SymbolToken} name '{instrument.Name ?? "<null>"}'");
+        }
 
         return instruments.Select(instrument => new StockSearchResult
         {
