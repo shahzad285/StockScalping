@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StockTrading.Common.DTOs;
@@ -31,7 +32,12 @@ public sealed class FinnhubFundamentalsService(
         }
 
         var requestUri = $"stock/profile2?symbol={Uri.EscapeDataString(symbol.Trim())}&token={Uri.EscapeDataString(_settings.ApiKey)}";
-        var response = await httpClient.GetFromJsonAsync<Dictionary<string, object>>(requestUri, cancellationToken);
+        var response = await GetJsonOrDefaultAsync<Dictionary<string, object>>(
+            requestUri,
+            "company profile",
+            "symbol",
+            symbol,
+            cancellationToken);
 
         if (response is null || response.Count == 0)
         {
@@ -88,7 +94,12 @@ public sealed class FinnhubFundamentalsService(
         }
 
         var requestUri = $"search?q={Uri.EscapeDataString(keywords.Trim())}&token={Uri.EscapeDataString(_settings.ApiKey)}";
-        var response = await httpClient.GetFromJsonAsync<Dictionary<string, object>>(requestUri, cancellationToken);
+        var response = await GetJsonOrDefaultAsync<Dictionary<string, object>>(
+            requestUri,
+            "symbol search",
+            "keywords",
+            keywords,
+            cancellationToken);
 
         if (response is null)
         {
@@ -130,6 +141,54 @@ public sealed class FinnhubFundamentalsService(
         return matches;
     }
 
+    private async Task<T?> GetJsonOrDefaultAsync<T>(
+        string requestUri,
+        string operation,
+        string contextName,
+        string contextValue,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await httpClient.GetAsync(requestUri, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning(
+                    "Finnhub {Operation} request failed for {ContextName} {ContextValue}. Status: {StatusCode}; Response: {ResponseBody}",
+                    operation,
+                    contextName,
+                    contextValue,
+                    (int)response.StatusCode,
+                    Truncate(responseBody));
+
+                return default;
+            }
+
+            return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Finnhub {Operation} request failed for {ContextName} {ContextValue}.",
+                operation,
+                contextName,
+                contextValue);
+            return default;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Finnhub {Operation} response could not be parsed for {ContextName} {ContextValue}.",
+                operation,
+                contextName,
+                contextValue);
+            return default;
+        }
+    }
+
     private static string GetValue(IReadOnlyDictionary<string, object> values, string key)
     {
         return values.TryGetValue(key, out var value) ? Convert.ToString(value, CultureInfo.InvariantCulture) ?? "" : "";
@@ -154,5 +213,17 @@ public sealed class FinnhubFundamentalsService(
                value.ValueKind == System.Text.Json.JsonValueKind.String
             ? value.GetString() ?? ""
             : "";
+    }
+
+    private static string Truncate(string value)
+    {
+        const int maxLength = 500;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        value = value.Trim();
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 }

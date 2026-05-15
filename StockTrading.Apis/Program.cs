@@ -55,6 +55,7 @@ builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("A
 builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Auth:Otp:Mobile:Twilio"));
 builder.Services.Configure<StockPollingSettings>(builder.Configuration.GetSection("StockPolling"));
 builder.Services.Configure<FundamentalsPollingSettings>(builder.Configuration.GetSection("FundamentalsPolling"));
+builder.Services.Configure<TapetideSettings>(builder.Configuration.GetSection("Tapetide"));
 builder.Services.Configure<AlphaVantageSettings>(builder.Configuration.GetSection("AlphaVantage"));
 builder.Services.Configure<FinnhubSettings>(builder.Configuration.GetSection("Finnhub"));
 
@@ -135,6 +136,11 @@ builder.Services.AddHostedService<StockPricePollingWorker>();
 builder.Services.AddHostedService<StockFundamentalsPollingWorker>();
 builder.Services.AddScoped<IStringEncryptionService, AesStringEncryptionService>();
 builder.Services.AddScoped<IBrokerSessionStore, BrokerSessionStore>();
+builder.Services.AddHttpClient<ITapetideFundamentalsService, TapetideFundamentalsService>((serviceProvider, client) =>
+{
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TapetideSettings>>().Value;
+    client.BaseAddress = new Uri(settings.BaseUrl);
+});
 builder.Services.AddHttpClient<IAlphaVantageFundamentalsService, AlphaVantageFundamentalsService>((serviceProvider, client) =>
 {
     var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AlphaVantageSettings>>().Value;

@@ -132,6 +132,71 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
 
     public async Task UpsertFundamentalsAsync(
         Stock stock,
+        TapetideCompanyProfile profile,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await connection.ExecuteAsync(
+            """
+            update stocks
+            set name = coalesce(@Name, stocks.name),
+                updated_at_utc = case when @Name is null then updated_at_utc else now() end
+            where id = @StockId;
+
+            insert into stock_profiles (
+                stock_id,
+                asset_type,
+                sector,
+                industry,
+                description,
+                dividend_yield,
+                debt_to_equity,
+                pe_ratio,
+                market_cap,
+                last_analyzed_at_utc,
+                created_at_utc
+            )
+            values (
+                @StockId,
+                @AssetType,
+                @Sector,
+                @Industry,
+                @Description,
+                @DividendYield,
+                @DebtToEquity,
+                @PeRatio,
+                @MarketCap,
+                now(),
+                now()
+            )
+            on conflict (stock_id) do update
+            set sector = coalesce(excluded.sector, stock_profiles.sector),
+                industry = coalesce(excluded.industry, stock_profiles.industry),
+                description = coalesce(excluded.description, stock_profiles.description),
+                dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
+                debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
+                pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
+                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
+                last_analyzed_at_utc = now(),
+                updated_at_utc = now()
+            """,
+            new
+            {
+                StockId = stock.Id,
+                Name = ToDbValue(profile.Name),
+                AssetType = "Equity",
+                Sector = ToDbValue(profile.Sector),
+                Industry = ToDbValue(profile.Industry),
+                Description = ToDbValue(profile.Description),
+                profile.DividendYield,
+                profile.DebtToEquity,
+                PeRatio = profile.PERatio,
+                MarketCap = profile.MarketCapitalization
+            });
+    }
+
+    public async Task UpsertFundamentalsAsync(
+        Stock stock,
         FinnhubCompanyProfile profile,
         CancellationToken cancellationToken = default)
     {

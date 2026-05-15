@@ -8,6 +8,7 @@ namespace StockTrading.Services;
 
 public sealed class StockFundamentalsService(
     IStockProfileRepository stockProfileRepository,
+    ITapetideFundamentalsService tapetideFundamentalsService,
     IAlphaVantageFundamentalsService alphaVantageFundamentalsService,
     IFinnhubFundamentalsService finnhubFundamentalsService,
     ILogger<StockFundamentalsService> logger) : IStockFundamentalsService
@@ -21,6 +22,29 @@ public sealed class StockFundamentalsService(
 
         foreach (var stock in stocks)
         {
+            logger.LogInformation(
+                "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Tapetide company profile.",
+                stock.Id,
+                stock.Symbol,
+                stock.TradingSymbol);
+
+            var tapetideProfile = await GetTapetideProfileAsync(stock, cancellationToken);
+            if (tapetideProfile != null)
+            {
+                await stockProfileRepository.UpsertFundamentalsAsync(stock, tapetideProfile, cancellationToken);
+                logger.LogInformation(
+                    "Saved Tapetide fundamentals for stock {StockId} {Symbol}. Sector: {Sector}; Industry: {Industry}; MarketCap: {MarketCap}; PERatio: {PERatio}.",
+                    stock.Id,
+                    stock.Symbol,
+                    tapetideProfile.Sector,
+                    tapetideProfile.Industry,
+                    tapetideProfile.MarketCapitalization,
+                    tapetideProfile.PERatio);
+
+                updatedCount++;
+                continue;
+            }
+
             logger.LogInformation(
                 "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Alpha Vantage symbol search.",
                 stock.Id,
@@ -74,6 +98,21 @@ public sealed class StockFundamentalsService(
         }
 
         return updatedCount;
+    }
+
+    private async Task<TapetideCompanyProfile?> GetTapetideProfileAsync(
+        Stock stock,
+        CancellationToken cancellationToken)
+    {
+        var symbol = GetBaseSymbol(stock);
+
+        logger.LogInformation(
+            "Trying Tapetide company profile for stock {StockId} {Symbol} using base symbol {TapetideSymbol}.",
+            stock.Id,
+            stock.Symbol,
+            symbol);
+
+        return await tapetideFundamentalsService.GetCompanyProfileAsync(symbol, cancellationToken);
     }
 
     private async Task<AlphaVantageCompanyOverview?> GetAlphaVantageOverviewFromSearchAsync(

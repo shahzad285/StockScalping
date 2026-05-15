@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StockTrading.Common.DTOs;
@@ -30,7 +31,12 @@ public sealed class AlphaVantageFundamentalsService(
         }
 
         var requestUri = $"query?function=OVERVIEW&symbol={Uri.EscapeDataString(symbol.Trim())}&apikey={Uri.EscapeDataString(_settings.ApiKey)}";
-        var response = await httpClient.GetFromJsonAsync<Dictionary<string, string>>(requestUri, cancellationToken);
+        var response = await GetJsonOrDefaultAsync<Dictionary<string, string>>(
+            requestUri,
+            "overview",
+            "symbol",
+            symbol,
+            cancellationToken);
 
         if (response is null)
         {
@@ -107,7 +113,12 @@ public sealed class AlphaVantageFundamentalsService(
         }
 
         var requestUri = $"query?function=SYMBOL_SEARCH&keywords={Uri.EscapeDataString(keywords.Trim())}&apikey={Uri.EscapeDataString(_settings.ApiKey)}";
-        var response = await httpClient.GetFromJsonAsync<Dictionary<string, object>>(requestUri, cancellationToken);
+        var response = await GetJsonOrDefaultAsync<Dictionary<string, object>>(
+            requestUri,
+            "symbol search",
+            "keywords",
+            keywords,
+            cancellationToken);
 
         if (response is null)
         {
@@ -153,6 +164,66 @@ public sealed class AlphaVantageFundamentalsService(
             keywords);
 
         return matches;
+    }
+
+    private async Task<T?> GetJsonOrDefaultAsync<T>(
+        string requestUri,
+        string operation,
+        string contextName,
+        string contextValue,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await httpClient.GetAsync(requestUri, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogWarning(
+                    "Alpha Vantage {Operation} request failed for {ContextName} {ContextValue}. Status: {StatusCode}; Response: {ResponseBody}",
+                    operation,
+                    contextName,
+                    contextValue,
+                    (int)response.StatusCode,
+                    Truncate(responseBody));
+
+                return default;
+            }
+
+            return await response.Content.ReadFromJsonAsync<T>(cancellationToken);
+        }
+        catch (HttpRequestException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Alpha Vantage {Operation} request failed for {ContextName} {ContextValue}.",
+                operation,
+                contextName,
+                contextValue);
+            return default;
+        }
+        catch (JsonException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Alpha Vantage {Operation} response could not be parsed for {ContextName} {ContextValue}.",
+                operation,
+                contextName,
+                contextValue);
+            return default;
+        }
+    }
+
+    private static string Truncate(string value)
+    {
+        const int maxLength = 500;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "";
+        }
+
+        value = value.Trim();
+        return value.Length <= maxLength ? value : value[..maxLength];
     }
 
     private static string GetJsonString(System.Text.Json.JsonElement element, string propertyName)
