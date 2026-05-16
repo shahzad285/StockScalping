@@ -15,6 +15,20 @@ export type WatchlistStock = {
   industry?: string | null;
   classificationReason?: string | null;
   confidenceScore?: number | null;
+  description?: string | null;
+  dividendYield?: number | null;
+  growthRate?: number | null;
+  debtToEquity?: number | null;
+  peRatio?: number | null;
+  earningsPerShare?: number | null;
+  priceToBook?: number | null;
+  totalRevenue?: number | null;
+  netIncome?: number | null;
+  totalDebt?: number | null;
+  totalCash?: number | null;
+  cashFlow?: number | null;
+  marketCap?: number | null;
+  lastAnalyzedAtUtc?: string | null;
 };
 
 export async function getWatchlistStocks(): Promise<{ stocks: WatchlistStock[] }> {

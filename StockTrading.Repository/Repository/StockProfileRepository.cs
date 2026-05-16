@@ -58,71 +58,6 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
         return stocks.ToArray();
     }
 
-    public async Task UpsertFundamentalsAsync(
-        Stock stock,
-        AlphaVantageCompanyOverview overview,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
-        await connection.ExecuteAsync(
-            """
-            update stocks
-            set name = coalesce(@Name, stocks.name),
-                updated_at_utc = case when @Name is null then updated_at_utc else now() end
-            where id = @StockId;
-
-            insert into stock_profiles (
-                stock_id,
-                asset_type,
-                sector,
-                industry,
-                description,
-                dividend_yield,
-                debt_to_equity,
-                pe_ratio,
-                market_cap,
-                last_analyzed_at_utc,
-                created_at_utc
-            )
-            values (
-                @StockId,
-                @AssetType,
-                @Sector,
-                @Industry,
-                @Description,
-                @DividendYield,
-                @DebtToEquity,
-                @PeRatio,
-                @MarketCap,
-                now(),
-                now()
-            )
-            on conflict (stock_id) do update
-            set sector = coalesce(excluded.sector, stock_profiles.sector),
-                industry = coalesce(excluded.industry, stock_profiles.industry),
-                description = coalesce(excluded.description, stock_profiles.description),
-                dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
-                debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
-                pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
-                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
-                last_analyzed_at_utc = now(),
-                updated_at_utc = now()
-            """,
-            new
-            {
-                StockId = stock.Id,
-                Name = ToDbValue(overview.Name),
-                AssetType = "Equity",
-                Sector = ToDbValue(overview.Sector),
-                Industry = ToDbValue(overview.Industry),
-                Description = ToDbValue(overview.Description),
-                overview.DividendYield,
-                overview.DebtToEquity,
-                PeRatio = overview.PERatio,
-                MarketCap = overview.MarketCapitalization
-            });
-    }
-
     private static string? ToDbValue(string value)
     {
         return string.IsNullOrWhiteSpace(value) || value.Equals("None", StringComparison.OrdinalIgnoreCase)
@@ -197,7 +132,100 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
 
     public async Task UpsertFundamentalsAsync(
         Stock stock,
-        FinnhubCompanyProfile profile,
+        YahooFinanceCompanyProfile profile,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await connection.ExecuteAsync(
+            """
+            update stocks
+            set name = coalesce(@Name, stocks.name),
+                updated_at_utc = case when @Name is null then updated_at_utc else now() end
+            where id = @StockId;
+
+            insert into stock_profiles (
+                stock_id,
+                asset_type,
+                sector,
+                industry,
+                description,
+                dividend_yield,
+                debt_to_equity,
+                pe_ratio,
+                earnings_per_share,
+                price_to_book,
+                total_revenue,
+                net_income,
+                total_debt,
+                total_cash,
+                cash_flow,
+                market_cap,
+                last_analyzed_at_utc,
+                created_at_utc
+            )
+            values (
+                @StockId,
+                @AssetType,
+                @Sector,
+                @Industry,
+                @Description,
+                @DividendYield,
+                @DebtToEquity,
+                @PeRatio,
+                @EarningsPerShare,
+                @PriceToBook,
+                @TotalRevenue,
+                @NetIncome,
+                @TotalDebt,
+                @TotalCash,
+                @CashFlow,
+                @MarketCap,
+                now(),
+                now()
+            )
+            on conflict (stock_id) do update
+            set sector = coalesce(excluded.sector, stock_profiles.sector),
+                industry = coalesce(excluded.industry, stock_profiles.industry),
+                description = coalesce(excluded.description, stock_profiles.description),
+                dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
+                debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
+                pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
+                earnings_per_share = coalesce(excluded.earnings_per_share, stock_profiles.earnings_per_share),
+                price_to_book = coalesce(excluded.price_to_book, stock_profiles.price_to_book),
+                total_revenue = coalesce(excluded.total_revenue, stock_profiles.total_revenue),
+                net_income = coalesce(excluded.net_income, stock_profiles.net_income),
+                total_debt = coalesce(excluded.total_debt, stock_profiles.total_debt),
+                total_cash = coalesce(excluded.total_cash, stock_profiles.total_cash),
+                cash_flow = coalesce(excluded.cash_flow, stock_profiles.cash_flow),
+                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
+                last_analyzed_at_utc = now(),
+                updated_at_utc = now()
+            """,
+            new
+            {
+                StockId = stock.Id,
+                Name = ToDbValue(profile.Name),
+                AssetType = "Equity",
+                Sector = ToDbValue(profile.Sector),
+                Industry = ToDbValue(profile.Industry),
+                Description = ToDbValue(profile.Description),
+                profile.DividendYield,
+                profile.DebtToEquity,
+                PeRatio = profile.PERatio,
+                profile.EarningsPerShare,
+                profile.PriceToBook,
+                profile.TotalRevenue,
+                profile.NetIncome,
+                profile.TotalDebt,
+                profile.TotalCash,
+                profile.CashFlow,
+                MarketCap = profile.MarketCapitalization
+            });
+    }
+
+    public async Task UpsertFundamentalsAsync(
+        Stock stock,
+        NseIndiaEquityProfile profile,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
@@ -212,7 +240,6 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 stock_id,
                 asset_type,
                 industry,
-                market_cap,
                 last_analyzed_at_utc,
                 created_at_utc
             )
@@ -220,23 +247,20 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @StockId,
                 @AssetType,
                 @Industry,
-                @MarketCap,
                 now(),
                 now()
             )
             on conflict (stock_id) do update
             set industry = coalesce(excluded.industry, stock_profiles.industry),
-                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
                 last_analyzed_at_utc = now(),
                 updated_at_utc = now()
             """,
             new
             {
                 StockId = stock.Id,
-                Name = ToDbValue(profile.Name),
+                Name = ToDbValue(profile.CompanyName),
                 AssetType = "Equity",
-                Industry = ToDbValue(profile.FinnhubIndustry),
-                MarketCap = profile.MarketCapitalization
+                Industry = ToDbValue(profile.Industry)
             });
     }
 }

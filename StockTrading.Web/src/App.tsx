@@ -71,6 +71,35 @@ function formatMoney(value: number): string {
   }).format(value);
 }
 
+function formatOptionalMoney(value?: number | null): string {
+  return value == null ? "-" : formatMoney(value);
+}
+
+function formatOptionalCrores(value?: number | null): string {
+  return value == null
+    ? "-"
+    : `${new Intl.NumberFormat("en-IN", {
+        maximumFractionDigits: 2
+      }).format(value)} Cr`;
+}
+
+function formatOptionalNumber(value?: number | null): string {
+  return value == null
+    ? "-"
+    : new Intl.NumberFormat("en-IN", {
+        maximumFractionDigits: 2
+      }).format(value);
+}
+
+function formatOptionalPercent(value?: number | null): string {
+  return value == null
+    ? "-"
+    : new Intl.NumberFormat("en-IN", {
+        style: "percent",
+        maximumFractionDigits: 2
+      }).format(value);
+}
+
 function StockLineChart({ candles }: { candles: StockCandle[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const width = 1000;
@@ -991,6 +1020,14 @@ function App() {
                     <span>Theme</span>
                     <strong>{stock.theme || "-"}</strong>
                   </div>
+                  <div>
+                    <span>Market cap</span>
+                    <strong>{formatOptionalCrores(stock.marketCap)}</strong>
+                  </div>
+                  <div>
+                    <span>P/E</span>
+                    <strong>{formatOptionalNumber(stock.peRatio)}</strong>
+                  </div>
                   <div className="row-actions">
                     <button type="button" className="secondary" onClick={() => openStockDetails(stock)}>
                       Details
@@ -1363,6 +1400,66 @@ function App() {
               <div>
                 <span>Confidence</span>
                 <strong>{stockDetails.confidenceScore == null ? "-" : `${stockDetails.confidenceScore}%`}</strong>
+              </div>
+              <div>
+                <span>Market cap</span>
+                <strong>{formatOptionalCrores(stockDetails.marketCap)}</strong>
+              </div>
+              <div>
+                <span>P/E</span>
+                <strong>{formatOptionalNumber(stockDetails.peRatio)}</strong>
+              </div>
+              <div>
+                <span>EPS</span>
+                <strong>{formatOptionalNumber(stockDetails.earningsPerShare)}</strong>
+              </div>
+              <div>
+                <span>P/B</span>
+                <strong>{formatOptionalNumber(stockDetails.priceToBook)}</strong>
+              </div>
+              <div>
+                <span>Revenue</span>
+                <strong>{formatOptionalCrores(stockDetails.totalRevenue)}</strong>
+              </div>
+              <div>
+                <span>Net income</span>
+                <strong>{formatOptionalCrores(stockDetails.netIncome)}</strong>
+              </div>
+              <div>
+                <span>Total debt</span>
+                <strong>{formatOptionalCrores(stockDetails.totalDebt)}</strong>
+              </div>
+              <div>
+                <span>Total cash</span>
+                <strong>{formatOptionalCrores(stockDetails.totalCash)}</strong>
+              </div>
+              <div>
+                <span>Cash flow</span>
+                <strong>{formatOptionalCrores(stockDetails.cashFlow)}</strong>
+              </div>
+              <div>
+                <span>Dividend yield</span>
+                <strong>{formatOptionalPercent(stockDetails.dividendYield)}</strong>
+              </div>
+              <div>
+                <span>Growth rate</span>
+                <strong>{formatOptionalPercent(stockDetails.growthRate)}</strong>
+              </div>
+              <div>
+                <span>Debt/equity</span>
+                <strong>{formatOptionalNumber(stockDetails.debtToEquity)}</strong>
+              </div>
+              <div>
+                <span>Last analyzed</span>
+                <strong>
+                  {stockDetails.lastAnalyzedAtUtc
+                    ? new Date(stockDetails.lastAnalyzedAtUtc).toLocaleString()
+                    : "-"}
+                </strong>
+              </div>
+              <div className="stock-detail-wide">
+                <span>Description</span>
+                <strong>{stockDetails.description || "-"}</strong>
               </div>
               <div className="stock-detail-wide">
                 <span>Classification reason</span>

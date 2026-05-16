@@ -15,4 +15,18 @@ public class WatchlistStock
     public string? Industry { get; set; }
     public string? ClassificationReason { get; set; }
     public decimal? ConfidenceScore { get; set; }
+    public string? Description { get; set; }
+    public decimal? DividendYield { get; set; }
+    public decimal? GrowthRate { get; set; }
+    public decimal? DebtToEquity { get; set; }
+    public decimal? PERatio { get; set; }
+    public decimal? EarningsPerShare { get; set; }
+    public decimal? PriceToBook { get; set; }
+    public decimal? TotalRevenue { get; set; }
+    public decimal? NetIncome { get; set; }
+    public decimal? TotalDebt { get; set; }
+    public decimal? TotalCash { get; set; }
+    public decimal? CashFlow { get; set; }
+    public decimal? MarketCap { get; set; }
+    public DateTime? LastAnalyzedAtUtc { get; set; }
 }

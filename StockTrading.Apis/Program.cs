@@ -56,8 +56,8 @@ builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Aut
 builder.Services.Configure<StockPollingSettings>(builder.Configuration.GetSection("StockPolling"));
 builder.Services.Configure<FundamentalsPollingSettings>(builder.Configuration.GetSection("FundamentalsPolling"));
 builder.Services.Configure<TapetideSettings>(builder.Configuration.GetSection("Tapetide"));
-builder.Services.Configure<AlphaVantageSettings>(builder.Configuration.GetSection("AlphaVantage"));
-builder.Services.Configure<FinnhubSettings>(builder.Configuration.GetSection("Finnhub"));
+builder.Services.Configure<YahooFinanceSettings>(builder.Configuration.GetSection("YahooFinance"));
+builder.Services.Configure<NseIndiaSettings>(builder.Configuration.GetSection("NseIndia"));
 
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
 if (string.IsNullOrWhiteSpace(jwtSecretKey))
@@ -141,14 +141,14 @@ builder.Services.AddHttpClient<ITapetideFundamentalsService, TapetideFundamental
     var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<TapetideSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
 });
-builder.Services.AddHttpClient<IAlphaVantageFundamentalsService, AlphaVantageFundamentalsService>((serviceProvider, client) =>
+builder.Services.AddHttpClient<IYahooFinanceFundamentalsService, YahooFinanceFundamentalsService>((serviceProvider, client) =>
 {
-    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<AlphaVantageSettings>>().Value;
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<YahooFinanceSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
 });
-builder.Services.AddHttpClient<IFinnhubFundamentalsService, FinnhubFundamentalsService>((serviceProvider, client) =>
+builder.Services.AddHttpClient<INseIndiaService, NseIndiaService>((serviceProvider, client) =>
 {
-    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<FinnhubSettings>>().Value;
+    var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<NseIndiaSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
 });
 builder.Services.AddHttpClient<AngelOneService>();

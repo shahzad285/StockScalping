@@ -76,6 +76,13 @@ public sealed class DapperDatabaseInitializer(IDbConnectionFactory connectionFac
             growth_rate numeric(10, 4) null,
             debt_to_equity numeric(10, 4) null,
             pe_ratio numeric(10, 4) null,
+            earnings_per_share numeric(18, 4) null,
+            price_to_book numeric(18, 4) null,
+            total_revenue numeric(20, 2) null,
+            net_income numeric(20, 2) null,
+            total_debt numeric(20, 2) null,
+            total_cash numeric(20, 2) null,
+            cash_flow numeric(20, 2) null,
             market_cap numeric(20, 2) null,
             last_analyzed_at_utc timestamptz null,
             created_at_utc timestamptz not null,
@@ -124,6 +131,27 @@ public sealed class DapperDatabaseInitializer(IDbConnectionFactory connectionFac
 
         alter table trade_plans
             add column if not exists watchlist_id integer null references watchlist(id) on delete set null;
+
+        alter table stock_profiles
+            add column if not exists earnings_per_share numeric(18, 4) null;
+
+        alter table stock_profiles
+            add column if not exists price_to_book numeric(18, 4) null;
+
+        alter table stock_profiles
+            add column if not exists total_revenue numeric(20, 2) null;
+
+        alter table stock_profiles
+            add column if not exists net_income numeric(20, 2) null;
+
+        alter table stock_profiles
+            add column if not exists total_debt numeric(20, 2) null;
+
+        alter table stock_profiles
+            add column if not exists total_cash numeric(20, 2) null;
+
+        alter table stock_profiles
+            add column if not exists cash_flow numeric(20, 2) null;
 
         do $$
         begin

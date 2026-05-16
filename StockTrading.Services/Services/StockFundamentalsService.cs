@@ -8,9 +8,9 @@ namespace StockTrading.Services;
 
 public sealed class StockFundamentalsService(
     IStockProfileRepository stockProfileRepository,
+    IYahooFinanceFundamentalsService yahooFinanceFundamentalsService,
+    INseIndiaService nseIndiaService,
     ITapetideFundamentalsService tapetideFundamentalsService,
-    IAlphaVantageFundamentalsService alphaVantageFundamentalsService,
-    IFinnhubFundamentalsService finnhubFundamentalsService,
     ILogger<StockFundamentalsService> logger) : IStockFundamentalsService
 {
     public async Task<int> RefreshMissingProfilesAsync(
@@ -22,6 +22,63 @@ public sealed class StockFundamentalsService(
 
         foreach (var stock in stocks)
         {
+            if (IsNseStock(stock))
+            {
+                logger.LogInformation(
+                    "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using NSE India equity profile.",
+                    stock.Id,
+                    stock.Symbol,
+                    stock.TradingSymbol);
+
+                var nseIndiaProfile = await GetNseIndiaProfileAsync(stock, cancellationToken);
+                if (nseIndiaProfile != null)
+                {
+                    await stockProfileRepository.UpsertFundamentalsAsync(stock, nseIndiaProfile, cancellationToken);
+                    logger.LogInformation(
+                        "Saved NSE India profile for stock {StockId} {Symbol}. Company: {CompanyName}; Industry: {Industry}.",
+                        stock.Id,
+                        stock.Symbol,
+                        nseIndiaProfile.CompanyName,
+                        nseIndiaProfile.Industry);
+
+                    updatedCount++;
+                    continue;
+                }
+
+                logger.LogWarning(
+                    "No NSE India equity profile returned for stock {StockId} {Symbol}.",
+                    stock.Id,
+                    stock.Symbol);
+            }
+
+            logger.LogInformation(
+                "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Yahoo Finance company profile.",
+                stock.Id,
+                stock.Symbol,
+                stock.TradingSymbol);
+
+            var yahooFinanceProfile = await GetYahooFinanceProfileAsync(stock, cancellationToken);
+            if (yahooFinanceProfile != null)
+            {
+                await stockProfileRepository.UpsertFundamentalsAsync(stock, yahooFinanceProfile, cancellationToken);
+                logger.LogInformation(
+                    "Saved Yahoo Finance fundamentals for stock {StockId} {Symbol}. Sector: {Sector}; Industry: {Industry}; MarketCap: {MarketCap}; PERatio: {PERatio}.",
+                    stock.Id,
+                    stock.Symbol,
+                    yahooFinanceProfile.Sector,
+                    yahooFinanceProfile.Industry,
+                    yahooFinanceProfile.MarketCapitalization,
+                    yahooFinanceProfile.PERatio);
+
+                updatedCount++;
+                continue;
+            }
+
+            logger.LogWarning(
+                "No Yahoo Finance company profile returned for stock {StockId} {Symbol}.",
+                stock.Id,
+                stock.Symbol);
+
             logger.LogInformation(
                 "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Tapetide company profile.",
                 stock.Id,
@@ -45,59 +102,47 @@ public sealed class StockFundamentalsService(
                 continue;
             }
 
-            logger.LogInformation(
-                "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Alpha Vantage symbol search.",
-                stock.Id,
-                stock.Symbol,
-                stock.TradingSymbol);
-
-            var overview = await GetAlphaVantageOverviewFromSearchAsync(stock, cancellationToken);
-
-            if (overview != null)
-            {
-                await stockProfileRepository.UpsertFundamentalsAsync(stock, overview, cancellationToken);
-                logger.LogInformation(
-                    "Saved Alpha Vantage fundamentals for stock {StockId} {Symbol}. Sector: {Sector}; Industry: {Industry}; MarketCap: {MarketCap}; PERatio: {PERatio}.",
-                    stock.Id,
-                    stock.Symbol,
-                    overview.Sector,
-                    overview.Industry,
-                    overview.MarketCapitalization,
-                    overview.PERatio);
-
-                updatedCount++;
-                continue;
-            }
-
-            logger.LogInformation(
-                "Falling back to Finnhub fundamentals for stock {StockId} {Symbol} using symbol search.",
+            logger.LogWarning(
+                "No Tapetide company profile returned for stock {StockId} {Symbol}.",
                 stock.Id,
                 stock.Symbol);
-
-            var finnhubProfile = await GetFinnhubProfileFromSearchAsync(stock, cancellationToken);
-            if (finnhubProfile == null)
-            {
-                logger.LogWarning(
-                    "No Finnhub company profile returned for stock {StockId} {Symbol} using symbol search.",
-                    stock.Id,
-                    stock.Symbol);
-
-                continue;
-            }
-
-            await stockProfileRepository.UpsertFundamentalsAsync(stock, finnhubProfile, cancellationToken);
-            logger.LogInformation(
-                "Saved Finnhub fundamentals for stock {StockId} {Symbol}. Name: {Name}; Industry: {Industry}; MarketCap: {MarketCap}.",
-                stock.Id,
-                stock.Symbol,
-                finnhubProfile.Name,
-                finnhubProfile.FinnhubIndustry,
-                finnhubProfile.MarketCapitalization);
-
-            updatedCount++;
         }
 
         return updatedCount;
+    }
+
+    private async Task<YahooFinanceCompanyProfile?> GetYahooFinanceProfileAsync(
+        Stock stock,
+        CancellationToken cancellationToken)
+    {
+        var symbol = GetBaseSymbol(stock);
+        var exchange = string.IsNullOrWhiteSpace(stock.Exchange)
+            ? "NSE"
+            : stock.Exchange.Trim().ToUpperInvariant();
+
+        logger.LogInformation(
+            "Trying Yahoo Finance company profile for stock {StockId} {Symbol} using base symbol {YahooFinanceSymbol} and exchange {Exchange}.",
+            stock.Id,
+            stock.Symbol,
+            symbol,
+            exchange);
+
+        return await yahooFinanceFundamentalsService.GetCompanyProfileAsync(symbol, exchange, cancellationToken);
+    }
+
+    private async Task<NseIndiaEquityProfile?> GetNseIndiaProfileAsync(
+        Stock stock,
+        CancellationToken cancellationToken)
+    {
+        var symbol = GetBaseSymbol(stock);
+
+        logger.LogInformation(
+            "Trying NSE India equity profile for stock {StockId} {Symbol} using base symbol {NseIndiaSymbol}.",
+            stock.Id,
+            stock.Symbol,
+            symbol);
+
+        return await nseIndiaService.GetEquityProfileAsync(symbol, cancellationToken);
     }
 
     private async Task<TapetideCompanyProfile?> GetTapetideProfileAsync(
@@ -115,99 +160,10 @@ public sealed class StockFundamentalsService(
         return await tapetideFundamentalsService.GetCompanyProfileAsync(symbol, cancellationToken);
     }
 
-    private async Task<AlphaVantageCompanyOverview?> GetAlphaVantageOverviewFromSearchAsync(
-        Stock stock,
-        CancellationToken cancellationToken)
+    private static bool IsNseStock(Stock stock)
     {
-        var keywords = string.IsNullOrWhiteSpace(stock.Name)
-            ? GetBaseSymbol(stock)
-            : stock.Name.Trim();
-
-        logger.LogInformation(
-            "Searching Alpha Vantage symbols for stock {StockId} {Symbol} using keywords {Keywords}.",
-            stock.Id,
-            stock.Symbol,
-            keywords);
-
-        var matches = await alphaVantageFundamentalsService.SearchSymbolsAsync(keywords, cancellationToken);
-        var match = matches.FirstOrDefault(item => IsMatchingAlphaVantageExchange(item, stock));
-        if (match == null)
-        {
-            logger.LogWarning(
-                "Alpha Vantage symbol search returned no exchange-matching symbol for stock {StockId} {Symbol} using keywords {Keywords}.",
-                stock.Id,
-                stock.Symbol,
-                keywords);
-            return null;
-        }
-
-        logger.LogInformation(
-            "Trying Alpha Vantage overview for stock {StockId} {Symbol} using searched symbol {AlphaVantageSymbol} ({Name}, {Region}).",
-            stock.Id,
-            stock.Symbol,
-            match.Symbol,
-            match.Name,
-            match.Region);
-
-        return await alphaVantageFundamentalsService.GetCompanyOverviewAsync(match.Symbol, cancellationToken);
-    }
-
-    private async Task<FinnhubCompanyProfile?> GetFinnhubProfileFromSearchAsync(
-        Stock stock,
-        CancellationToken cancellationToken)
-    {
-        var keywords = string.IsNullOrWhiteSpace(stock.Name)
-            ? GetBaseSymbol(stock)
-            : stock.Name.Trim();
-
-        logger.LogInformation(
-            "Searching Finnhub symbols for stock {StockId} {Symbol} using keywords {Keywords}.",
-            stock.Id,
-            stock.Symbol,
-            keywords);
-
-        var matches = await finnhubFundamentalsService.SearchSymbolsAsync(keywords, cancellationToken);
-        var match = matches.FirstOrDefault(item => IsMatchingFinnhubExchange(item, stock));
-        if (match == null)
-        {
-            logger.LogWarning(
-                "Finnhub symbol search returned no exchange-matching symbol for stock {StockId} {Symbol} using keywords {Keywords}.",
-                stock.Id,
-                stock.Symbol,
-                keywords);
-            return null;
-        }
-
-        logger.LogInformation(
-            "Trying Finnhub company profile for stock {StockId} {Symbol} using searched symbol {FinnhubSymbol} ({Description}).",
-            stock.Id,
-            stock.Symbol,
-            match.Symbol,
-            match.Description);
-
-        return await finnhubFundamentalsService.GetCompanyProfileAsync(match.Symbol, cancellationToken);
-    }
-
-    private static bool IsMatchingAlphaVantageExchange(AlphaVantageSymbolSearchMatch match, Stock stock)
-    {
-        var exchange = string.IsNullOrWhiteSpace(stock.Exchange)
-            ? "NSE"
-            : stock.Exchange.Trim().ToUpperInvariant();
-
-        return exchange == "BSE"
-            ? match.Symbol.EndsWith(".BSE", StringComparison.OrdinalIgnoreCase)
-            : match.Symbol.EndsWith(".NSE", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsMatchingFinnhubExchange(FinnhubSymbolSearchMatch match, Stock stock)
-    {
-        var exchange = string.IsNullOrWhiteSpace(stock.Exchange)
-            ? "NSE"
-            : stock.Exchange.Trim().ToUpperInvariant();
-
-        return exchange == "BSE"
-            ? match.Symbol.EndsWith(".BO", StringComparison.OrdinalIgnoreCase)
-            : match.Symbol.EndsWith(".NS", StringComparison.OrdinalIgnoreCase);
+        return string.IsNullOrWhiteSpace(stock.Exchange) ||
+            stock.Exchange.Trim().Equals("NSE", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetBaseSymbol(Stock stock)

@@ -25,7 +25,21 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 stock_profiles.sector as Sector,
                 stock_profiles.industry as Industry,
                 stock_profiles.classification_reason as ClassificationReason,
-                stock_profiles.confidence_score as ConfidenceScore
+                stock_profiles.confidence_score as ConfidenceScore,
+                stock_profiles.description as Description,
+                stock_profiles.dividend_yield as DividendYield,
+                stock_profiles.growth_rate as GrowthRate,
+                stock_profiles.debt_to_equity as DebtToEquity,
+                stock_profiles.pe_ratio as PERatio,
+                stock_profiles.earnings_per_share as EarningsPerShare,
+                stock_profiles.price_to_book as PriceToBook,
+                stock_profiles.total_revenue / 10000000 as TotalRevenue,
+                stock_profiles.net_income / 10000000 as NetIncome,
+                stock_profiles.total_debt / 10000000 as TotalDebt,
+                stock_profiles.total_cash / 10000000 as TotalCash,
+                stock_profiles.cash_flow / 10000000 as CashFlow,
+                stock_profiles.market_cap as MarketCap,
+                stock_profiles.last_analyzed_at_utc as LastAnalyzedAtUtc
             from watchlist
             join stocks
               on stocks.id = watchlist.stock_id
