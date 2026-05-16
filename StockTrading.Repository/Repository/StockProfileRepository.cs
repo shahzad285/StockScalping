@@ -84,6 +84,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 sector,
                 industry,
                 description,
+                fundamentals_source,
                 dividend_yield,
                 debt_to_equity,
                 pe_ratio,
@@ -97,6 +98,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @Sector,
                 @Industry,
                 @Description,
+                @FundamentalsSource,
                 @DividendYield,
                 @DebtToEquity,
                 @PeRatio,
@@ -108,6 +110,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             set sector = coalesce(excluded.sector, stock_profiles.sector),
                 industry = coalesce(excluded.industry, stock_profiles.industry),
                 description = coalesce(excluded.description, stock_profiles.description),
+                fundamentals_source = excluded.fundamentals_source,
                 dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
                 debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
                 pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
@@ -123,6 +126,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 Sector = ToDbValue(profile.Sector),
                 Industry = ToDbValue(profile.Industry),
                 Description = ToDbValue(profile.Description),
+                FundamentalsSource = "Tapetide",
                 profile.DividendYield,
                 profile.DebtToEquity,
                 PeRatio = profile.PERatio,
@@ -149,6 +153,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 sector,
                 industry,
                 description,
+                fundamentals_source,
                 dividend_yield,
                 debt_to_equity,
                 pe_ratio,
@@ -169,6 +174,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @Sector,
                 @Industry,
                 @Description,
+                @FundamentalsSource,
                 @DividendYield,
                 @DebtToEquity,
                 @PeRatio,
@@ -187,6 +193,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             set sector = coalesce(excluded.sector, stock_profiles.sector),
                 industry = coalesce(excluded.industry, stock_profiles.industry),
                 description = coalesce(excluded.description, stock_profiles.description),
+                fundamentals_source = excluded.fundamentals_source,
                 dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
                 debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
                 pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
@@ -209,6 +216,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 Sector = ToDbValue(profile.Sector),
                 Industry = ToDbValue(profile.Industry),
                 Description = ToDbValue(profile.Description),
+                FundamentalsSource = "YahooFinance",
                 profile.DividendYield,
                 profile.DebtToEquity,
                 PeRatio = profile.PERatio,
@@ -240,6 +248,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 stock_id,
                 asset_type,
                 industry,
+                fundamentals_source,
                 last_analyzed_at_utc,
                 created_at_utc
             )
@@ -247,11 +256,13 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @StockId,
                 @AssetType,
                 @Industry,
+                @FundamentalsSource,
                 now(),
                 now()
             )
             on conflict (stock_id) do update
             set industry = coalesce(excluded.industry, stock_profiles.industry),
+                fundamentals_source = excluded.fundamentals_source,
                 last_analyzed_at_utc = now(),
                 updated_at_utc = now()
             """,
@@ -260,7 +271,8 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 StockId = stock.Id,
                 Name = ToDbValue(profile.CompanyName),
                 AssetType = "Equity",
-                Industry = ToDbValue(profile.Industry)
+                Industry = ToDbValue(profile.Industry),
+                FundamentalsSource = "NseIndia"
             });
     }
 }

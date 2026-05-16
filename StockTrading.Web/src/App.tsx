@@ -1402,6 +1402,10 @@ function App() {
                 <strong>{stockDetails.confidenceScore == null ? "-" : `${stockDetails.confidenceScore}%`}</strong>
               </div>
               <div>
+                <span>Fundamentals source</span>
+                <strong>{stockDetails.fundamentalsSource || "-"}</strong>
+              </div>
+              <div>
                 <span>Market cap</span>
                 <strong>{formatOptionalCrores(stockDetails.marketCap)}</strong>
               </div>

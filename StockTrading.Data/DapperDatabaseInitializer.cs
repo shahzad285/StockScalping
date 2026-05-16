@@ -70,6 +70,7 @@ public sealed class DapperDatabaseInitializer(IDbConnectionFactory connectionFac
             sector varchar(100) null,
             industry varchar(150) null,
             description text null,
+            fundamentals_source varchar(40) null,
             classification_reason text null,
             confidence_score numeric(5, 2) null,
             dividend_yield numeric(10, 4) null,
@@ -131,6 +132,9 @@ public sealed class DapperDatabaseInitializer(IDbConnectionFactory connectionFac
 
         alter table trade_plans
             add column if not exists watchlist_id integer null references watchlist(id) on delete set null;
+
+        alter table stock_profiles
+            add column if not exists fundamentals_source varchar(40) null;
 
         alter table stock_profiles
             add column if not exists earnings_per_share numeric(18, 4) null;

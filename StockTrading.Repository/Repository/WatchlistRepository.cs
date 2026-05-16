@@ -27,6 +27,7 @@ public sealed class WatchlistRepository(IDbConnectionFactory connectionFactory) 
                 stock_profiles.classification_reason as ClassificationReason,
                 stock_profiles.confidence_score as ConfidenceScore,
                 stock_profiles.description as Description,
+                stock_profiles.fundamentals_source as FundamentalsSource,
                 stock_profiles.dividend_yield as DividendYield,
                 stock_profiles.growth_rate as GrowthRate,
                 stock_profiles.debt_to_equity as DebtToEquity,

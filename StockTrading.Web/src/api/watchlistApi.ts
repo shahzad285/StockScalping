@@ -16,6 +16,7 @@ export type WatchlistStock = {
   classificationReason?: string | null;
   confidenceScore?: number | null;
   description?: string | null;
+  fundamentalsSource?: string | null;
   dividendYield?: number | null;
   growthRate?: number | null;
   debtToEquity?: number | null;
