@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -119,12 +120,34 @@ public sealed class NseIndiaService(
             return null;
         }
 
+        var priceInfo = GetObject(root, "priceInfo");
+        var securityInfo = GetObject(root, "securityInfo");
+        var metadata = GetObject(root, "metadata");
+        var lastPrice = GetDecimal(priceInfo, "lastPrice");
+        var issuedSize = GetDecimal(securityInfo, "issuedSize");
+        var marketCapitalization =
+            GetDecimal(root, "marketCap", "marketCapitalization", "ffmc") ??
+            GetDecimal(securityInfo, "marketCap", "marketCapitalization", "ffmc");
+        if (marketCapitalization is null && lastPrice is not null && issuedSize is not null)
+        {
+            marketCapitalization = lastPrice * issuedSize;
+        }
+
         return new NseIndiaEquityProfile
         {
             Symbol = GetString(info, "symbol") ?? requestedSymbol,
             CompanyName = GetString(info, "companyName") ?? "",
-            Industry = GetString(info, "industry") ?? ""
+            Industry = GetString(info, "industry") ?? "",
+            MarketCapitalization = marketCapitalization,
+            PERatio = GetDecimal(metadata, "pdSymbolPe")
         };
+    }
+
+    private static JsonElement? GetObject(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Object
+            ? value
+            : null;
     }
 
     private static string? GetString(JsonElement element, params string[] propertyNames)
@@ -135,6 +158,40 @@ public sealed class NseIndiaService(
                 property.ValueKind == JsonValueKind.String)
             {
                 return property.GetString();
+            }
+        }
+
+        return null;
+    }
+
+    private static decimal? GetDecimal(JsonElement? element, params string[] propertyNames)
+    {
+        if (element is null)
+        {
+            return null;
+        }
+
+        foreach (var propertyName in propertyNames)
+        {
+            if (!element.Value.TryGetProperty(propertyName, out var property))
+            {
+                continue;
+            }
+
+            if (property.ValueKind == JsonValueKind.Number &&
+                property.TryGetDecimal(out var number))
+            {
+                return number;
+            }
+
+            if (property.ValueKind == JsonValueKind.String &&
+                decimal.TryParse(
+                    property.GetString()?.Replace(",", "", StringComparison.Ordinal).Trim(),
+                    NumberStyles.Any,
+                    CultureInfo.InvariantCulture,
+                    out var parsed))
+            {
+                return parsed;
             }
         }
 

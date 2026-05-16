@@ -170,7 +170,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 profile.DividendYield,
                 profile.DebtToEquity,
                 PeRatio = profile.PERatio,
-                MarketCap = profile.MarketCapitalization
+                MarketCap = ToCrores(profile.MarketCapitalization)
             });
     }
 
@@ -266,7 +266,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 profile.TotalDebt,
                 profile.TotalCash,
                 profile.CashFlow,
-                MarketCap = profile.MarketCapitalization
+                MarketCap = ToCrores(profile.MarketCapitalization)
             });
     }
 
@@ -288,6 +288,8 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 asset_type,
                 industry,
                 updated_by_nse,
+                pe_ratio,
+                market_cap,
                 last_analyzed_at_utc,
                 created_at_utc
             )
@@ -296,12 +298,16 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @AssetType,
                 @Industry,
                 true,
+                @PeRatio,
+                @MarketCap,
                 now(),
                 now()
             )
             on conflict (stock_id) do update
             set industry = coalesce(excluded.industry, stock_profiles.industry),
                 updated_by_nse = true,
+                pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
+                market_cap = coalesce(excluded.market_cap, stock_profiles.market_cap),
                 last_analyzed_at_utc = now(),
                 updated_at_utc = now()
             """,
@@ -310,7 +316,21 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 StockId = stock.Id,
                 Name = ToDbValue(profile.CompanyName),
                 AssetType = "Equity",
-                Industry = ToDbValue(profile.Industry)
+                Industry = ToDbValue(profile.Industry),
+                PeRatio = profile.PERatio,
+                MarketCap = ToCrores(profile.MarketCapitalization)
             });
+    }
+
+    private static decimal? ToCrores(decimal? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        return value.Value >= 1000000m
+            ? decimal.Round(value.Value / 10000000m, 2)
+            : value;
     }
 }

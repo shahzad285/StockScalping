@@ -8,8 +8,43 @@ namespace StockTrading.Services;
 
 public sealed class StockService(
     IBrokerService brokerService,
+    IStockRepository stockRepository,
     IWatchlistRepository watchlistRepository) : IStockService
 {
+    public Task<IReadOnlyList<WatchlistStock>> GetStocksAsync(CancellationToken cancellationToken = default)
+    {
+        return stockRepository.GetAllAsync(cancellationToken);
+    }
+
+    public Task<Stock> SaveStockAsync(SaveStockRequest request, CancellationToken cancellationToken = default)
+    {
+        var normalizedRequest = Normalize(request);
+        return stockRepository.UpsertAsync(normalizedRequest, cancellationToken);
+    }
+
+    public async Task<StockServiceDeleteResult> DeleteStockAsync(
+        int stockId,
+        CancellationToken cancellationToken = default)
+    {
+        var stock = await stockRepository.GetByIdAsync(stockId, cancellationToken);
+        if (stock == null)
+        {
+            return new StockServiceDeleteResult(false, "Stock not found.");
+        }
+
+        var deleteCheck = await stockRepository.GetDeleteCheckAsync(stockId, cancellationToken);
+        if (deleteCheck.HasDependencies)
+        {
+            return new StockServiceDeleteResult(
+                false,
+                "Stock cannot be removed because it is used by other records.",
+                deleteCheck.GetMessages());
+        }
+
+        await stockRepository.DeleteAsync(stockId, cancellationToken);
+        return new StockServiceDeleteResult(true, "Stock removed.");
+    }
+
     public Task<HoldingsResponse> GetHoldingsAsync(CancellationToken cancellationToken = default)
     {
         return brokerService.GetHoldingsAsync();
@@ -51,5 +86,20 @@ public sealed class StockService(
     {
         var stocks = await watchlistRepository.GetAllAsync(cancellationToken);
         return await brokerService.GetPricesAsync(stocks);
+    }
+
+    private static SaveStockRequest Normalize(SaveStockRequest request)
+    {
+        return new SaveStockRequest
+        {
+            StockId = request.StockId,
+            Symbol = request.Symbol.Trim().ToUpperInvariant(),
+            Name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim(),
+            Exchange = request.Exchange,
+            SymbolToken = request.SymbolToken.Trim(),
+            TradingSymbol = string.IsNullOrWhiteSpace(request.TradingSymbol)
+                ? request.Symbol.Trim().ToUpperInvariant()
+                : request.TradingSymbol.Trim().ToUpperInvariant()
+        };
     }
 }

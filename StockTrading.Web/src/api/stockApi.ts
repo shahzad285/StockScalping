@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient";
+import { WatchlistStock } from "./watchlistApi";
 
 export type HoldingStock = {
   stockName: string;
@@ -36,6 +37,17 @@ export type StockSearchResult = {
   name?: string | null;
 };
 
+export type StockMaster = {
+  id?: number;
+  symbol: string;
+  name?: string | null;
+  exchange: StockExchange;
+  symbolToken: string;
+  tradingSymbol: string;
+  createdAtUtc?: string;
+  updatedAtUtc?: string | null;
+};
+
 export type StockChartRange = "OneDay" | "OneWeek" | "OneMonth" | "SixMonths" | "OneYear";
 
 export type StockCandle = {
@@ -49,6 +61,23 @@ export type StockCandle = {
 
 export async function getHoldings(): Promise<HoldingsResponse> {
   return apiRequest<HoldingsResponse>("/Stock/holdings");
+}
+
+export async function getStocks(): Promise<{ stocks: WatchlistStock[] }> {
+  return apiRequest<{ stocks: WatchlistStock[] }>("/Stock/stocks");
+}
+
+export async function saveStock(stock: StockMaster): Promise<{ stock: StockMaster }> {
+  return apiRequest<{ stock: StockMaster }>("/Stock/stocks", {
+    method: "POST",
+    body: JSON.stringify(stock)
+  });
+}
+
+export async function deleteStock(stockId: number): Promise<void> {
+  await apiRequest<void>(`/Stock/stocks/${stockId}`, {
+    method: "DELETE"
+  });
 }
 
 export async function getPrices(): Promise<{ prices: StockPrice[] }> {

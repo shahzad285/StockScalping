@@ -15,7 +15,17 @@ public class StockProfile
     public decimal? GrowthRate { get; set; }
     public decimal? DebtToEquity { get; set; }
     public decimal? PeRatio { get; set; }
+    public decimal? EarningsPerShare { get; set; }
+    public decimal? PriceToBook { get; set; }
+    public decimal? TotalRevenue { get; set; }
+    public decimal? NetIncome { get; set; }
+    public decimal? TotalDebt { get; set; }
+    public decimal? TotalCash { get; set; }
+    public decimal? CashFlow { get; set; }
     public decimal? MarketCap { get; set; }
+    public bool UpdatedByNse { get; set; }
+    public bool UpdatedByYahoo { get; set; }
+    public bool UpdatedByTapetide { get; set; }
     public DateTime? LastAnalyzedAtUtc { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; set; }

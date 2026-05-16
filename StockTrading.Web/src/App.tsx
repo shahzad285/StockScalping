@@ -5,11 +5,15 @@ import { authExpiredEventName } from "./api/apiClient";
 import {
   getHoldings,
   getPrices,
+  getStocks,
   getStockChart,
   HoldingStock,
+  deleteStock,
+  saveStock,
   StockCandle,
   StockChartRange,
   StockExchange,
+  StockMaster,
   StockPrice,
   StockSearchResult
 } from "./api/stockApi";
@@ -24,7 +28,7 @@ import {
 } from "./api/watchlistApi";
 
 type View = "holdings" | "prices" | "orders";
-type Page = "dashboard" | "watchlists" | "tradeplans";
+type Page = "dashboard" | "stocks" | "watchlists" | "tradeplans";
 
 const chartRanges: { label: string; value: StockChartRange }[] = [
   { label: "1D", value: "OneDay" },
@@ -46,6 +50,14 @@ const emptyWatchlistStock: WatchlistStock = {
   industry: "",
   classificationReason: "",
   confidenceScore: null
+};
+
+const emptyStockForm: StockMaster = {
+  symbol: "",
+  name: null,
+  exchange: "NSE",
+  symbolToken: "",
+  tradingSymbol: ""
 };
 
 const emptyTradePlan: TradePlan = {
@@ -219,6 +231,11 @@ function App() {
   const [prices, setPrices] = useState<StockPrice[]>([]);
   const [orders, setOrders] = useState<OrderDetails[]>([]);
   const [page, setPage] = useState<Page>("dashboard");
+  const [stocks, setStocks] = useState<WatchlistStock[]>([]);
+  const [stockForm, setStockForm] = useState<StockMaster>(emptyStockForm);
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockSearchResults, setStockSearchResults] = useState<StockSearchResult[]>([]);
+  const [isStockSearching, setIsStockSearching] = useState(false);
   const [watchlistStocks, setWatchlistStocks] = useState<WatchlistStock[]>([]);
   const [selectedWatchlistForm, setSelectedWatchlistForm] = useState<WatchlistStock>(emptyWatchlistStock);
   const [watchlistStockSearch, setWatchlistStockSearch] = useState("");
@@ -305,6 +322,124 @@ function App() {
       setMessage(error instanceof Error ? error.message : "Broker login failed.");
     } finally {
       setIsBrokerConnecting(false);
+    }
+  }
+
+  async function loadStocks() {
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      const result = await getStocks();
+      setStocks(result.stocks);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to load stocks.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleStockSearch() {
+    const query = stockSearch.trim() || stockForm.symbol.trim();
+    if (!query) {
+      setMessageType("error");
+      setMessage("Enter a stock to search.");
+      return;
+    }
+
+    setIsStockSearching(true);
+    setMessage("");
+
+    try {
+      const result = await searchStocks(query, stockForm.exchange);
+      setStockSearchResults(result.stocks);
+      if (result.stocks.length === 0) {
+        setMessageType("error");
+        setMessage("No stocks found.");
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to search stocks.");
+    } finally {
+      setIsStockSearching(false);
+    }
+  }
+
+  function selectStock(stock: StockSearchResult) {
+    setStockForm((current) => ({
+      ...current,
+      symbol: stock.symbol,
+      name: stock.name ?? null,
+      exchange: stock.exchange,
+      symbolToken: stock.symbolToken,
+      tradingSymbol: stock.tradingSymbol
+    }));
+    setStockSearch(stock.tradingSymbol || stock.symbol);
+    setStockSearchResults([]);
+    setMessage("");
+  }
+
+  async function handleStockSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!stockForm.symbolToken) {
+      setMessageType("error");
+      setMessage("Search and select a stock first.");
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await saveStock({
+        ...stockForm,
+        tradingSymbol: stockForm.tradingSymbol || stockForm.symbol
+      });
+      setStockForm(emptyStockForm);
+      setStockSearch("");
+      setStockSearchResults([]);
+      setMessageType("success");
+      setMessage(stockForm.id ? "Stock updated." : "Stock saved.");
+      await loadStocks();
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to save stock.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handleModalBackdropClick(event: MouseEvent<HTMLDivElement>, close: () => void) {
+    if (event.target === event.currentTarget) {
+      close();
+    }
+  }
+
+  async function handleDeleteStock(stock: WatchlistStock) {
+    if (!stock.stockId) {
+      return;
+    }
+
+    const stockName = stock.tradingSymbol || stock.symbol || "this stock";
+    if (!window.confirm(`Remove ${stockName} from Stocks?`)) {
+      return;
+    }
+
+    setIsBusy(true);
+    setMessage("");
+
+    try {
+      await deleteStock(stock.stockId);
+      setStocks((current) => current.filter((item) => item.stockId !== stock.stockId));
+      setMessageType("success");
+      setMessage("Stock removed.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Unable to remove stock.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -406,6 +541,11 @@ function App() {
       return;
     }
 
+    const stockName = stock.tradingSymbol || stock.symbol || "this stock";
+    if (!window.confirm(`Remove ${stockName} from Watchlist?`)) {
+      return;
+    }
+
     setIsBusy(true);
     setMessage("");
 
@@ -452,6 +592,24 @@ function App() {
     setChartRange("OneMonth");
     setChartCandles([]);
     void loadStockChart(stock, "OneMonth");
+  }
+
+  function openHoldingChart(holding: HoldingStock) {
+    const stock: WatchlistStock = {
+      stockId: 0,
+      watchlistId: 0,
+      symbol: holding.stockName || holding.tradingSymbol,
+      name: holding.stockName || null,
+      exchange: holding.exchange,
+      symbolToken: holding.symbolToken,
+      tradingSymbol: holding.tradingSymbol,
+      assetType: "Unknown",
+      updatedByNse: false,
+      updatedByYahoo: false,
+      updatedByTapetide: false
+    };
+
+    openStockChart(stock);
   }
 
   function closeStockChart() {
@@ -583,6 +741,12 @@ function App() {
   }
 
   async function handleDeleteTradePlan(id: number) {
+    const tradePlan = tradePlans.find((item) => item.id === id);
+    const stockName = tradePlan?.tradingSymbol || tradePlan?.symbol || "this trade plan";
+    if (!window.confirm(`Remove trade plan for ${stockName}?`)) {
+      return;
+    }
+
     setIsBusy(true);
     setMessage("");
 
@@ -666,6 +830,8 @@ function App() {
     setPrices([]);
     setOrders([]);
     setTotalProfitLoss(0);
+    setStocks([]);
+    setStockForm(emptyStockForm);
     setWatchlistStocks([]);
     setTradePlans([]);
     setTradePlanForm(emptyTradePlan);
@@ -673,6 +839,11 @@ function App() {
   }, []);
 
   function handleRefresh() {
+    if (page === "stocks") {
+      void loadStocks();
+      return;
+    }
+
     if (page === "watchlists") {
       void loadWatchlist();
       return;
@@ -709,6 +880,12 @@ function App() {
   useEffect(() => {
     if (token && page === "watchlists") {
       void loadWatchlist();
+    }
+  }, [token, page]);
+
+  useEffect(() => {
+    if (token && page === "stocks") {
+      void loadStocks();
     }
   }, [token, page]);
 
@@ -834,6 +1011,9 @@ function App() {
           <button type="button" className={page === "dashboard" ? "" : "secondary"} onClick={() => setPage("dashboard")}>
             Dashboard
           </button>
+          <button type="button" className={page === "stocks" ? "" : "secondary"} onClick={() => setPage("stocks")}>
+            Stocks
+          </button>
           <button type="button" className={page === "watchlists" ? "" : "secondary"} onClick={() => setPage("watchlists")}>
             Watchlists
           </button>
@@ -850,6 +1030,131 @@ function App() {
       </header>
 
       {message && <p className={messageType === "success" ? "success-text" : "error-text"}>{message}</p>}
+
+      {page === "stocks" && (
+        <section className="watchlists-page">
+          <div className="watchlist-detail">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Stock Master</p>
+                <h2>Add stock</h2>
+              </div>
+            </div>
+
+            <form className="stock-plan-form" onSubmit={handleStockSubmit}>
+              <div className="stock-search-field">
+                <label>
+                  Search stock
+                  <input value={stockSearch} onChange={(event) => setStockSearch(event.target.value)} placeholder="CIPLA" />
+                </label>
+                <label>
+                  Exchange
+                  <select
+                    value={stockForm.exchange}
+                    onChange={(event) => {
+                      setStockForm((current) => ({
+                        ...current,
+                        exchange: event.target.value as StockExchange,
+                        symbol: "",
+                        symbolToken: "",
+                        tradingSymbol: ""
+                      }));
+                      setStockSearchResults([]);
+                    }}
+                  >
+                    <option value="NSE">NSE</option>
+                    <option value="BSE">BSE</option>
+                  </select>
+                </label>
+                <button type="button" onClick={() => void handleStockSearch()} disabled={isStockSearching}>
+                  {isStockSearching ? "Searching..." : "Search"}
+                </button>
+              </div>
+
+              {stockSearchResults.length > 0 && (
+                <div className="stock-search-results">
+                  {stockSearchResults.map((stock) => (
+                    <button type="button" key={`${stock.exchange}-${stock.symbolToken}`} onClick={() => selectStock(stock)}>
+                      <strong>{stock.tradingSymbol || stock.symbol}</strong>
+                      <span>
+                        {stock.exchange} - {stock.symbolToken}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {stockForm.symbolToken && (
+                <div className="selected-stock-summary">
+                  <div>
+                    <span>Symbol</span>
+                    <strong>{stockForm.symbol}</strong>
+                  </div>
+                  <div>
+                    <span>Trading symbol</span>
+                    <strong>{stockForm.tradingSymbol || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Exchange</span>
+                    <strong>{stockForm.exchange}</strong>
+                  </div>
+                  <div>
+                    <span>Token</span>
+                    <strong>{stockForm.symbolToken}</strong>
+                  </div>
+                </div>
+              )}
+
+              <label>
+                Name
+                <input
+                  value={stockForm.name ?? ""}
+                  onChange={(event) =>
+                    setStockForm((current) => ({
+                      ...current,
+                      name: event.target.value || null
+                    }))
+                  }
+                  placeholder="Optional company name"
+                />
+              </label>
+
+              <button type="submit" disabled={isBusy}>
+                Save stock
+              </button>
+            </form>
+
+            <div className="planned-stocks">
+              {stocks.map((stock) => (
+                <article key={stock.stockId || `${stock.exchange}-${stock.symbolToken}`}>
+                  <div>
+                    <strong>{stock.tradingSymbol || stock.symbol}</strong>
+                    <span>
+                      {stock.exchange} - {stock.symbolToken}
+                    </span>
+                  </div>
+                  <div>
+                    <span>Name</span>
+                    <strong>{stock.name || "-"}</strong>
+                  </div>
+                  <div>
+                    <span>Symbol</span>
+                    <strong>{stock.symbol}</strong>
+                  </div>
+                  <div className="row-actions">
+                    <button type="button" className="secondary" onClick={() => openStockDetails(stock)}>
+                      Details
+                    </button>
+                    <button type="button" className="secondary" onClick={() => void handleDeleteStock(stock)} disabled={isBusy}>
+                      Remove
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {page === "watchlists" && (
         <section className="watchlists-page">
@@ -1265,7 +1570,7 @@ function App() {
       )}
 
       {tradePlanDetails && (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop" role="presentation" onClick={(event) => handleModalBackdropClick(event, closeTradePlanDetails)}>
           <section className="details-modal" role="dialog" aria-modal="true" aria-label="Trade plan details">
             <div className="chart-modal-header">
               <div>
@@ -1352,7 +1657,7 @@ function App() {
       )}
 
       {stockDetails && (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop" role="presentation" onClick={(event) => handleModalBackdropClick(event, closeStockDetails)}>
           <section className="details-modal" role="dialog" aria-modal="true" aria-label="Stock details">
             <div className="chart-modal-header">
               <div>
@@ -1483,7 +1788,7 @@ function App() {
       )}
 
       {chartStock && (
-        <div className="modal-backdrop" role="presentation">
+        <div className="modal-backdrop" role="presentation" onClick={(event) => handleModalBackdropClick(event, closeStockChart)}>
           <section className="chart-modal" role="dialog" aria-modal="true" aria-label="Stock chart">
             <div className="chart-modal-header">
               <div>
@@ -1597,6 +1902,7 @@ function App() {
                 <th>Avg</th>
                 <th>LTP</th>
                 <th>P/L</th>
+                <th>Chart</th>
               </tr>
             </thead>
             <tbody>
@@ -1608,6 +1914,11 @@ function App() {
                   <td>{formatMoney(holding.currentPrice)}</td>
                   <td className={holding.totalGainOrLoss >= 0 ? "positive" : "negative"}>
                     {formatMoney(holding.totalGainOrLoss)}
+                  </td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => openHoldingChart(holding)} disabled={isBusy || !holding.symbolToken}>
+                      Chart
+                    </button>
                   </td>
                 </tr>
               ))}

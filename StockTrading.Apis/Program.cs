@@ -100,6 +100,7 @@ builder.Services.AddScoped<IApplicationUserRepository, ApplicationUserRepository
 builder.Services.AddScoped<IApplicationRoleRepository, ApplicationRoleRepository>();
 builder.Services.AddScoped<IApplicationOtpRepository, ApplicationOtpRepository>();
 builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<ITradePlanRepository, TradePlanRepository>();
 builder.Services.AddScoped<IStockProfileRepository, StockProfileRepository>();
 builder.Services.AddScoped<IBrokerSessionRepository, BrokerSessionRepository>();
