@@ -16,7 +16,9 @@ public class WatchlistStock
     public string? ClassificationReason { get; set; }
     public decimal? ConfidenceScore { get; set; }
     public string? Description { get; set; }
-    public string? FundamentalsSource { get; set; }
+    public bool UpdatedByNse { get; set; }
+    public bool UpdatedByYahoo { get; set; }
+    public bool UpdatedByTapetide { get; set; }
     public decimal? DividendYield { get; set; }
     public decimal? GrowthRate { get; set; }
     public decimal? DebtToEquity { get; set; }

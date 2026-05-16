@@ -1402,8 +1402,16 @@ function App() {
                 <strong>{stockDetails.confidenceScore == null ? "-" : `${stockDetails.confidenceScore}%`}</strong>
               </div>
               <div>
-                <span>Fundamentals source</span>
-                <strong>{stockDetails.fundamentalsSource || "-"}</strong>
+                <span>Updated by NSE</span>
+                <strong>{stockDetails.updatedByNse ? "Yes" : "No"}</strong>
+              </div>
+              <div>
+                <span>Updated by Yahoo</span>
+                <strong>{stockDetails.updatedByYahoo ? "Yes" : "No"}</strong>
+              </div>
+              <div>
+                <span>Updated by Tapetide</span>
+                <strong>{stockDetails.updatedByTapetide ? "Yes" : "No"}</strong>
               </div>
               <div>
                 <span>Market cap</span>

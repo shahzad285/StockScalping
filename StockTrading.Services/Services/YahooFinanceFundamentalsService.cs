@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -30,21 +31,36 @@ public sealed class YahooFinanceFundamentalsService(
         try
         {
             var session = await GetYahooSessionAsync(yahooSymbol, cancellationToken);
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                $"v10/finance/quoteSummary/{Uri.EscapeDataString(yahooSymbol)}?modules=summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory,price,assetProfile{GetCrumbQuery(session.Crumb)}");
-            AddYahooHeaders(request, session.CookieHeader);
-
-            using var response = await httpClient.SendAsync(request, cancellationToken);
-            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (!response.IsSuccessStatusCode)
+            var (response, responseBody) = await SendQuoteSummaryAsync(
+                yahooSymbol,
+                session.Crumb,
+                cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden &&
+                !string.IsNullOrWhiteSpace(session.Crumb))
             {
                 logger.LogWarning(
-                    "Yahoo Finance company profile request failed for symbol {Symbol}. Status: {StatusCode}; Response: {ResponseBody}",
-                    yahooSymbol,
+                    "Yahoo Finance quoteSummary returned {StatusCode} for symbol {Symbol} with crumb. Retrying without crumb.",
                     (int)response.StatusCode,
-                    Truncate(responseBody));
-                return null;
+                    yahooSymbol);
+
+                response.Dispose();
+                (response, responseBody) = await SendQuoteSummaryAsync(
+                    yahooSymbol,
+                    crumb: null,
+                    cancellationToken);
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    logger.LogWarning(
+                        "Yahoo Finance company profile request failed for symbol {Symbol}. Status: {StatusCode}; Response: {ResponseBody}",
+                        yahooSymbol,
+                        (int)response.StatusCode,
+                        Truncate(responseBody));
+                    return null;
+                }
             }
 
             using var document = JsonDocument.Parse(responseBody);
@@ -93,16 +109,32 @@ public sealed class YahooFinanceFundamentalsService(
         }
     }
 
+    private async Task<(HttpResponseMessage Response, string ResponseBody)> SendQuoteSummaryAsync(
+        string yahooSymbol,
+        string? crumb,
+        CancellationToken cancellationToken)
+    {
+        var modules = "summaryDetail,financialData,defaultKeyStatistics,incomeStatementHistory,balanceSheetHistory,cashflowStatementHistory,price,assetProfile";
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"v10/finance/quoteSummary/{Uri.EscapeDataString(yahooSymbol)}?modules={modules}{GetCrumbQuery(crumb)}");
+        AddYahooHeaders(request, acceptHtml: false);
+
+        var response = await httpClient.SendAsync(request, cancellationToken);
+        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+        return (response, responseBody);
+    }
+
     private async Task<YahooSession> GetYahooSessionAsync(
         string yahooSymbol,
         CancellationToken cancellationToken)
     {
-        var cookieHeader = await GetCookieHeaderAsync(yahooSymbol, cancellationToken);
-        var crumb = await GetCrumbAsync(cookieHeader, cancellationToken);
-        return new YahooSession(cookieHeader, crumb);
+        await WarmUpSessionAsync(yahooSymbol, cancellationToken);
+        var crumb = await GetCrumbAsync(cancellationToken);
+        return new YahooSession(crumb);
     }
 
-    private async Task<string?> GetCookieHeaderAsync(
+    private async Task WarmUpSessionAsync(
         string yahooSymbol,
         CancellationToken cancellationToken)
     {
@@ -113,29 +145,16 @@ public sealed class YahooFinanceFundamentalsService(
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             new Uri(new Uri(cookieBaseUrl), $"quote/{Uri.EscapeDataString(yahooSymbol)}"));
-        AddYahooHeaders(request);
+        AddYahooHeaders(request, acceptHtml: true);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.Headers.TryGetValues("Set-Cookie", out var setCookieValues))
-        {
-            return null;
-        }
-
-        var cookies = setCookieValues
-            .Select(value => value.Split(';', 2)[0].Trim())
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        return cookies.Length == 0 ? null : string.Join("; ", cookies);
     }
 
     private async Task<string?> GetCrumbAsync(
-        string? cookieHeader,
         CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "v1/test/getcrumb");
-        AddYahooHeaders(request, cookieHeader);
+        AddYahooHeaders(request, acceptHtml: false);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
@@ -150,17 +169,26 @@ public sealed class YahooFinanceFundamentalsService(
             : crumb;
     }
 
-    private void AddYahooHeaders(HttpRequestMessage request, string? cookieHeader = null)
+    private void AddYahooHeaders(HttpRequestMessage request, bool acceptHtml)
     {
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        if (acceptHtml)
+        {
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/html"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xhtml+xml"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/xml", 0.9));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*", 0.8));
+        }
+        else
+        {
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/plain"));
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*", 0.8));
+        }
+
+        request.Headers.AcceptLanguage.Add(new StringWithQualityHeaderValue("en-US"));
         if (!string.IsNullOrWhiteSpace(_settings.UserAgent))
         {
             request.Headers.UserAgent.ParseAdd(_settings.UserAgent);
-        }
-
-        if (!string.IsNullOrWhiteSpace(cookieHeader))
-        {
-            request.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         }
     }
 
@@ -385,5 +413,5 @@ public sealed class YahooFinanceFundamentalsService(
         return value.Length <= maxLength ? value : value[..maxLength];
     }
 
-    private sealed record YahooSession(string? CookieHeader, string? Crumb);
+    private sealed record YahooSession(string? Crumb);
 }

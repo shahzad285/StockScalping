@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Net;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -145,11 +146,23 @@ builder.Services.AddHttpClient<IYahooFinanceFundamentalsService, YahooFinanceFun
 {
     var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<YahooFinanceSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+    CookieContainer = new CookieContainer(),
+    UseCookies = true
 });
 builder.Services.AddHttpClient<INseIndiaService, NseIndiaService>((serviceProvider, client) =>
 {
     var settings = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<NseIndiaSettings>>().Value;
     client.BaseAddress = new Uri(settings.BaseUrl);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+    CookieContainer = new CookieContainer(),
+    UseCookies = true
 });
 builder.Services.AddHttpClient<AngelOneService>();
 builder.Services.AddScoped<IBrokerService>(serviceProvider =>

@@ -48,6 +48,13 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                       and nullif(trim(stock_profiles.industry), '') is null
                   )
                   or stock_profiles.market_cap is null
+                  or stock_profiles.pe_ratio is null
+                  or stock_profiles.earnings_per_share is null
+                  or stock_profiles.total_revenue is null
+                  or stock_profiles.net_income is null
+                  or stock_profiles.total_debt is null
+                  or stock_profiles.total_cash is null
+                  or stock_profiles.cash_flow is null
                   or stock_profiles.last_analyzed_at_utc is null
               )
             order by stocks.symbol
@@ -56,6 +63,40 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             new { Limit = Math.Max(1, limit) });
 
         return stocks.ToArray();
+    }
+
+    public async Task<bool> HasMissingFundamentalsAsync(
+        int stockId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        return await connection.ExecuteScalarAsync<bool>(
+            """
+            select exists (
+                select 1
+                from stocks
+                left join stock_profiles
+                  on stock_profiles.stock_id = stocks.id
+                where stocks.id = @StockId
+                  and (
+                      stock_profiles.id is null
+                      or (
+                          nullif(trim(stock_profiles.sector), '') is null
+                          and nullif(trim(stock_profiles.industry), '') is null
+                      )
+                      or stock_profiles.market_cap is null
+                      or stock_profiles.pe_ratio is null
+                      or stock_profiles.earnings_per_share is null
+                      or stock_profiles.total_revenue is null
+                      or stock_profiles.net_income is null
+                      or stock_profiles.total_debt is null
+                      or stock_profiles.total_cash is null
+                      or stock_profiles.cash_flow is null
+                      or stock_profiles.last_analyzed_at_utc is null
+                  )
+            )
+            """,
+            new { StockId = stockId });
     }
 
     private static string? ToDbValue(string value)
@@ -84,7 +125,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 sector,
                 industry,
                 description,
-                fundamentals_source,
+                updated_by_tapetide,
                 dividend_yield,
                 debt_to_equity,
                 pe_ratio,
@@ -98,7 +139,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @Sector,
                 @Industry,
                 @Description,
-                @FundamentalsSource,
+                true,
                 @DividendYield,
                 @DebtToEquity,
                 @PeRatio,
@@ -110,7 +151,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             set sector = coalesce(excluded.sector, stock_profiles.sector),
                 industry = coalesce(excluded.industry, stock_profiles.industry),
                 description = coalesce(excluded.description, stock_profiles.description),
-                fundamentals_source = excluded.fundamentals_source,
+                updated_by_tapetide = true,
                 dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
                 debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
                 pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
@@ -126,7 +167,6 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 Sector = ToDbValue(profile.Sector),
                 Industry = ToDbValue(profile.Industry),
                 Description = ToDbValue(profile.Description),
-                FundamentalsSource = "Tapetide",
                 profile.DividendYield,
                 profile.DebtToEquity,
                 PeRatio = profile.PERatio,
@@ -153,7 +193,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 sector,
                 industry,
                 description,
-                fundamentals_source,
+                updated_by_yahoo,
                 dividend_yield,
                 debt_to_equity,
                 pe_ratio,
@@ -174,7 +214,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @Sector,
                 @Industry,
                 @Description,
-                @FundamentalsSource,
+                true,
                 @DividendYield,
                 @DebtToEquity,
                 @PeRatio,
@@ -193,7 +233,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             set sector = coalesce(excluded.sector, stock_profiles.sector),
                 industry = coalesce(excluded.industry, stock_profiles.industry),
                 description = coalesce(excluded.description, stock_profiles.description),
-                fundamentals_source = excluded.fundamentals_source,
+                updated_by_yahoo = true,
                 dividend_yield = coalesce(excluded.dividend_yield, stock_profiles.dividend_yield),
                 debt_to_equity = coalesce(excluded.debt_to_equity, stock_profiles.debt_to_equity),
                 pe_ratio = coalesce(excluded.pe_ratio, stock_profiles.pe_ratio),
@@ -216,7 +256,6 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 Sector = ToDbValue(profile.Sector),
                 Industry = ToDbValue(profile.Industry),
                 Description = ToDbValue(profile.Description),
-                FundamentalsSource = "YahooFinance",
                 profile.DividendYield,
                 profile.DebtToEquity,
                 PeRatio = profile.PERatio,
@@ -248,7 +287,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 stock_id,
                 asset_type,
                 industry,
-                fundamentals_source,
+                updated_by_nse,
                 last_analyzed_at_utc,
                 created_at_utc
             )
@@ -256,13 +295,13 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 @StockId,
                 @AssetType,
                 @Industry,
-                @FundamentalsSource,
+                true,
                 now(),
                 now()
             )
             on conflict (stock_id) do update
             set industry = coalesce(excluded.industry, stock_profiles.industry),
-                fundamentals_source = excluded.fundamentals_source,
+                updated_by_nse = true,
                 last_analyzed_at_utc = now(),
                 updated_at_utc = now()
             """,
@@ -271,8 +310,7 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
                 StockId = stock.Id,
                 Name = ToDbValue(profile.CompanyName),
                 AssetType = "Equity",
-                Industry = ToDbValue(profile.Industry),
-                FundamentalsSource = "NseIndia"
+                Industry = ToDbValue(profile.Industry)
             });
     }
 }

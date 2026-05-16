@@ -22,6 +22,8 @@ public sealed class StockFundamentalsService(
 
         foreach (var stock in stocks)
         {
+            var stockUpdated = false;
+
             if (IsNseStock(stock))
             {
                 logger.LogInformation(
@@ -41,14 +43,15 @@ public sealed class StockFundamentalsService(
                         nseIndiaProfile.CompanyName,
                         nseIndiaProfile.Industry);
 
-                    updatedCount++;
-                    continue;
+                    stockUpdated = true;
                 }
-
-                logger.LogWarning(
-                    "No NSE India equity profile returned for stock {StockId} {Symbol}.",
-                    stock.Id,
-                    stock.Symbol);
+                else
+                {
+                    logger.LogWarning(
+                        "No NSE India equity profile returned for stock {StockId} {Symbol}.",
+                        stock.Id,
+                        stock.Symbol);
+                }
             }
 
             logger.LogInformation(
@@ -70,14 +73,20 @@ public sealed class StockFundamentalsService(
                     yahooFinanceProfile.MarketCapitalization,
                     yahooFinanceProfile.PERatio);
 
-                updatedCount++;
-                continue;
+                stockUpdated = true;
+                if (!await stockProfileRepository.HasMissingFundamentalsAsync(stock.Id, cancellationToken))
+                {
+                    updatedCount++;
+                    continue;
+                }
             }
-
-            logger.LogWarning(
-                "No Yahoo Finance company profile returned for stock {StockId} {Symbol}.",
-                stock.Id,
-                stock.Symbol);
+            else
+            {
+                logger.LogWarning(
+                    "No Yahoo Finance company profile returned for stock {StockId} {Symbol}.",
+                    stock.Id,
+                    stock.Symbol);
+            }
 
             logger.LogInformation(
                 "Fetching fundamentals for stock {StockId} {Symbol} {TradingSymbol} using Tapetide company profile.",
@@ -98,14 +107,21 @@ public sealed class StockFundamentalsService(
                     tapetideProfile.MarketCapitalization,
                     tapetideProfile.PERatio);
 
-                updatedCount++;
-                continue;
+                stockUpdated = true;
             }
 
-            logger.LogWarning(
-                "No Tapetide company profile returned for stock {StockId} {Symbol}.",
-                stock.Id,
-                stock.Symbol);
+            if (tapetideProfile == null)
+            {
+                logger.LogWarning(
+                    "No Tapetide company profile returned for stock {StockId} {Symbol}.",
+                    stock.Id,
+                    stock.Symbol);
+            }
+
+            if (stockUpdated)
+            {
+                updatedCount++;
+            }
         }
 
         return updatedCount;
