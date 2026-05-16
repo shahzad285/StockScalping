@@ -42,6 +42,10 @@ public sealed class StockRepository(IDbConnectionFactory connectionFactory) : IS
                 stock_profiles.total_cash / 10000000 as TotalCash,
                 stock_profiles.cash_flow / 10000000 as CashFlow,
                 stock_profiles.market_cap as MarketCap,
+                coalesce(stock_profiles.stock_category, 'Unknown') as StockCategory,
+                stock_profiles.stock_category_reason as StockCategoryReason,
+                stock_profiles.stock_category_confidence as StockCategoryConfidence,
+                stock_profiles.stock_category_updated_at_utc as StockCategoryUpdatedAtUtc,
                 stock_profiles.last_analyzed_at_utc as LastAnalyzedAtUtc
             from stocks
             left join stock_profiles

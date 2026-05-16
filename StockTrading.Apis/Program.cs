@@ -61,6 +61,7 @@ builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("A
 builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Auth:Otp:Mobile:Twilio"));
 builder.Services.Configure<StockPollingSettings>(builder.Configuration.GetSection("StockPolling"));
 builder.Services.Configure<FundamentalsPollingSettings>(builder.Configuration.GetSection("FundamentalsPolling"));
+builder.Services.Configure<MarketScheduleSettings>(builder.Configuration.GetSection("MarketSchedule"));
 builder.Services.Configure<TapetideSettings>(builder.Configuration.GetSection("Tapetide"));
 builder.Services.Configure<YahooFinanceSettings>(builder.Configuration.GetSection("YahooFinance"));
 builder.Services.Configure<NseIndiaSettings>(builder.Configuration.GetSection("NseIndia"));
@@ -108,6 +109,8 @@ builder.Services.AddScoped<IWatchlistRepository, WatchlistRepository>();
 builder.Services.AddScoped<IStockRepository, StockRepository>();
 builder.Services.AddScoped<ITradePlanRepository, TradePlanRepository>();
 builder.Services.AddScoped<IStockProfileRepository, StockProfileRepository>();
+builder.Services.AddScoped<IWatchlistDataRepository, WatchlistDataRepository>();
+builder.Services.AddScoped<IMarketJobDecisionRepository, MarketJobDecisionRepository>();
 builder.Services.AddScoped<IBrokerSessionRepository, BrokerSessionRepository>();
 builder.Services.AddScoped<IOtpDeliveryService, OtpDeliveryService>();
 builder.Services.AddHttpClient<SendGridEmailOtpSender>(client =>
@@ -139,6 +142,7 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWatchlistService, WatchlistService>();
 builder.Services.AddScoped<ITradePlanService, TradePlanService>();
 builder.Services.AddScoped<IStockFundamentalsService, StockFundamentalsService>();
+builder.Services.AddScoped<IMarketScheduleService, MarketScheduleService>();
 builder.Services.AddHostedService<StockPricePollingWorker>();
 builder.Services.AddHostedService<StockFundamentalsPollingWorker>();
 builder.Services.AddScoped<IStringEncryptionService, AesStringEncryptionService>();

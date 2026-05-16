@@ -31,6 +31,10 @@ export type WatchlistStock = {
   totalCash?: number | null;
   cashFlow?: number | null;
   marketCap?: number | null;
+  stockCategory?: string | null;
+  stockCategoryReason?: string | null;
+  stockCategoryConfidence?: number | null;
+  stockCategoryUpdatedAtUtc?: string | null;
   lastAnalyzedAtUtc?: string | null;
 };
 

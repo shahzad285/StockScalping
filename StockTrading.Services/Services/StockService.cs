@@ -9,7 +9,9 @@ namespace StockTrading.Services;
 public sealed class StockService(
     IBrokerService brokerService,
     IStockRepository stockRepository,
-    IWatchlistRepository watchlistRepository) : IStockService
+    IWatchlistRepository watchlistRepository,
+    IWatchlistDataRepository watchlistDataRepository,
+    IMarketScheduleService marketScheduleService) : IStockService
 {
     public Task<IReadOnlyList<WatchlistStock>> GetStocksAsync(CancellationToken cancellationToken = default)
     {
@@ -72,20 +74,70 @@ public sealed class StockService(
     public async Task<List<StockPrice>> GetConfiguredPricesAsync(CancellationToken cancellationToken = default)
     {
         var stocks = await watchlistRepository.GetAllAsync(cancellationToken);
-        return await brokerService.GetPricesAsync(stocks);
+        var decision = await marketScheduleService.DecideAsync("ConfiguredPriceApi", cancellationToken: cancellationToken);
+        if (!decision.JobsEnabled)
+        {
+            return GetMarketClosedPrices(stocks, decision);
+        }
+
+        var prices = await brokerService.GetPricesAsync(stocks);
+        await watchlistDataRepository.UpsertDailyPricesAsync(
+            stocks,
+            prices,
+            decision.DecisionDate,
+            DateTime.UtcNow,
+            cancellationToken);
+
+        return prices;
     }
 
-    public Task<List<StockPrice>> GetPricesAsync(
+    public async Task<List<StockPrice>> GetPricesAsync(
         IEnumerable<WatchlistStock> stocks,
         CancellationToken cancellationToken = default)
     {
-        return brokerService.GetPricesAsync(stocks);
+        var stockList = stocks.ToArray();
+        var decision = await marketScheduleService.DecideAsync("PriceApi", cancellationToken: cancellationToken);
+        if (!decision.JobsEnabled)
+        {
+            return GetMarketClosedPrices(stockList, decision);
+        }
+
+        return await brokerService.GetPricesAsync(stockList);
     }
 
     public async Task<List<StockPrice>> RefreshConfiguredPricesAsync(CancellationToken cancellationToken = default)
     {
         var stocks = await watchlistRepository.GetAllAsync(cancellationToken);
-        return await brokerService.GetPricesAsync(stocks);
+        var decision = await marketScheduleService.DecideAsync("StockPricePolling", cancellationToken: cancellationToken);
+        if (!decision.JobsEnabled)
+        {
+            return GetMarketClosedPrices(stocks, decision);
+        }
+
+        var prices = await brokerService.GetPricesAsync(stocks);
+        await watchlistDataRepository.UpsertDailyPricesAsync(
+            stocks,
+            prices,
+            decision.DecisionDate,
+            DateTime.UtcNow,
+            cancellationToken);
+
+        return prices;
+    }
+
+    private static List<StockPrice> GetMarketClosedPrices(
+        IEnumerable<WatchlistStock> stocks,
+        MarketJobDecisionResult decision)
+    {
+        return stocks.Select(stock => new StockPrice
+        {
+            Symbol = stock.Symbol,
+            TradingSymbol = stock.TradingSymbol,
+            Exchange = string.IsNullOrWhiteSpace(stock.Exchange) ? decision.Exchange : stock.Exchange,
+            SymbolToken = stock.SymbolToken,
+            IsFetched = false,
+            Message = decision.DecisionReason
+        }).ToList();
     }
 
     private static SaveStockRequest Normalize(SaveStockRequest request)

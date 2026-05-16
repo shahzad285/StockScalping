@@ -1708,6 +1708,14 @@ function App() {
                 <strong>{stockDetails.confidenceScore == null ? "-" : `${stockDetails.confidenceScore}%`}</strong>
               </div>
               <div>
+                <span>Stock category</span>
+                <strong>{stockDetails.stockCategory || "Unknown"}</strong>
+              </div>
+              <div>
+                <span>Category confidence</span>
+                <strong>{stockDetails.stockCategoryConfidence == null ? "-" : `${stockDetails.stockCategoryConfidence}%`}</strong>
+              </div>
+              <div>
                 <span>Updated by NSE</span>
                 <strong>{stockDetails.updatedByNse ? "Yes" : "No"}</strong>
               </div>
@@ -1782,6 +1790,10 @@ function App() {
               <div className="stock-detail-wide">
                 <span>Classification reason</span>
                 <strong>{stockDetails.classificationReason || "-"}</strong>
+              </div>
+              <div className="stock-detail-wide">
+                <span>Category reason</span>
+                <strong>{stockDetails.stockCategoryReason || "-"}</strong>
               </div>
             </div>
           </section>

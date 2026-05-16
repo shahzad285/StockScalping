@@ -33,6 +33,16 @@ public sealed class StockPricePollingWorker(
         try
         {
             using var scope = scopeFactory.CreateScope();
+            var marketScheduleService = scope.ServiceProvider.GetRequiredService<IMarketScheduleService>();
+            var decision = await marketScheduleService.DecideAsync("StockPricePolling", cancellationToken: cancellationToken);
+            if (!decision.JobsEnabled)
+            {
+                logger.LogInformation(
+                    "Stock price polling skipped. Reason: {Reason}",
+                    decision.DecisionReason);
+                return;
+            }
+
             var brokerSessionStore = scope.ServiceProvider.GetRequiredService<IBrokerSessionStore>();
             var brokerSession = await brokerSessionStore.GetAsync("AngelOne", cancellationToken: cancellationToken);
             if (brokerSession == null ||
