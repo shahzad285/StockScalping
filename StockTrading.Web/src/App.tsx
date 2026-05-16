@@ -10,6 +10,7 @@ import {
   HoldingStock,
   deleteStock,
   saveStock,
+  searchStocks,
   StockCandle,
   StockChartRange,
   StockExchange,
