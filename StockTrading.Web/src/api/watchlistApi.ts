@@ -51,7 +51,7 @@ export async function searchWatchlistStocks(
     exchange
   });
 
-  return apiRequest<{ stocks: StockSearchResult[] }>(`/Watchlist/stocks/search?${params.toString()}`);
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/Common/StockSearch?${params.toString()}`);
 }
 
 export async function saveWatchlistStock(stock: WatchlistStock): Promise<{ stock: WatchlistStock }> {

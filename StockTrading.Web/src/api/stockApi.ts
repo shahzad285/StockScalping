@@ -90,7 +90,7 @@ export async function searchStocks(query: string, exchange: StockExchange = "NSE
     exchange
   });
 
-  return apiRequest<{ stocks: StockSearchResult[] }>(`/Stock/search?${params.toString()}`);
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/Common/StockSearch?${params.toString()}`);
 }
 
 export async function getStockChart(

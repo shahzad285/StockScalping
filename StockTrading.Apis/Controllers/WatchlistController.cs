@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using StockTrading.Common.DTOs;
-using StockTrading.Common.Enums;
 using StockTrading.IServices;
 
 namespace StockTrading.Controllers;
@@ -10,12 +9,10 @@ namespace StockTrading.Controllers;
 public class WatchlistController : ControllerBase
 {
     private readonly IWatchlistService _watchlistService;
-    private readonly IStockService _stockService;
 
-    public WatchlistController(IWatchlistService watchlistService, IStockService stockService)
+    public WatchlistController(IWatchlistService watchlistService)
     {
         _watchlistService = watchlistService;
-        _stockService = stockService;
     }
 
     [HttpGet("stocks")]
@@ -23,30 +20,6 @@ public class WatchlistController : ControllerBase
     {
         var stocks = await _watchlistService.GetStocksAsync(HttpContext.RequestAborted);
         return Ok(new { stocks });
-    }
-
-    [HttpGet("stocks/search")]
-    public async Task<IActionResult> SearchStocks([FromQuery] string query, [FromQuery] StockExchange exchange = StockExchange.NSE)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return BadRequest(new { message = "Search query is required." });
-        }
-
-        if (!Enum.IsDefined(exchange))
-        {
-            return BadRequest(new { message = "Exchange must be NSE or BSE." });
-        }
-
-        try
-        {
-            var stocks = await _stockService.SearchStocksAsync(query, exchange, HttpContext.RequestAborted);
-            return Ok(new { stocks });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = "Failed to search stocks", error = ex.Message });
-        }
     }
 
     [HttpPost("stocks")]

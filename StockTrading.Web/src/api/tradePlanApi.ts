@@ -36,7 +36,7 @@ export async function searchTradePlanStocks(
     exchange
   });
 
-  return apiRequest<{ stocks: StockSearchResult[] }>(`/TradePlan/stocks/search?${params.toString()}`);
+  return apiRequest<{ stocks: StockSearchResult[] }>(`/Common/StockSearch?${params.toString()}`);
 }
 
 export async function saveTradePlan(tradePlan: TradePlan): Promise<{ tradePlan: TradePlan }> {

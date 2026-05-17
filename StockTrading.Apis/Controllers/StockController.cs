@@ -85,30 +85,6 @@ public class StockController : ControllerBase
         }
     }
 
-    [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string query, [FromQuery] StockExchange exchange = StockExchange.NSE)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return BadRequest(new { message = "Search query is required." });
-        }
-
-        if (!Enum.IsDefined(exchange))
-        {
-            return BadRequest(new { message = "Exchange must be NSE or BSE." });
-        }
-
-        try
-        {
-            var stocks = await _stockService.SearchStocksAsync(query, exchange, HttpContext.RequestAborted);
-            return Ok(new { stocks });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { message = "Failed to search stocks", error = ex.Message });
-        }
-    }
-
     [HttpGet("chart")]
     public async Task<IActionResult> Chart(
         [FromQuery] string symbolToken,
