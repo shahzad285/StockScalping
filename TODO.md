@@ -23,6 +23,7 @@
 - Added stock search API with NSE/BSE only and NSE as default.
 - Added stock search to Watchlist and Trade Plan forms.
 - Moved duplicate stock search endpoints to common endpoint `GET /Common/StockSearch`.
+- Moved shared stock chart endpoint to common endpoint `GET /Common/StockChart`.
 - Removed duplicate stock search endpoints from Stock, Watchlist, and Trade Plan controllers.
 - Updated Stock, Watchlist, and Trade Plan UI search calls to use `/Common/StockSearch`.
 - Made stock identity fields view-only after selecting a search result.

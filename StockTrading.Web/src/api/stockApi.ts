@@ -104,5 +104,5 @@ export async function getStockChart(
     range
   });
 
-  return apiRequest<{ candles: StockCandle[] }>(`/Stock/chart?${params.toString()}`);
+  return apiRequest<{ candles: StockCandle[] }>(`/Common/StockChart?${params.toString()}`);
 }
