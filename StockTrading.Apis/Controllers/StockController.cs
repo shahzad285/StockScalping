@@ -83,5 +83,4 @@ public class StockController : ControllerBase
             return BadRequest(new { message = "Failed to retrieve stock prices", error = ex.Message });
         }
     }
-
 }
