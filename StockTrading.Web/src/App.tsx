@@ -113,6 +113,30 @@ function formatOptionalPercent(value?: number | null): string {
       }).format(value);
 }
 
+function getCandleHighLow(candles: StockCandle[]): { high: number; low: number } | null {
+  if (candles.length === 0) {
+    return null;
+  }
+
+  return {
+    high: Math.max(...candles.map((candle) => candle.high)),
+    low: Math.min(...candles.map((candle) => candle.low))
+  };
+}
+
+function getChartSummary(candles: StockCandle[]): { open: number; high: number; low: number; close: number } | null {
+  if (candles.length === 0) {
+    return null;
+  }
+
+  return {
+    open: candles[0].open,
+    high: Math.max(...candles.map((candle) => candle.high)),
+    low: Math.min(...candles.map((candle) => candle.low)),
+    close: candles[candles.length - 1].close
+  };
+}
+
 function StockLineChart({ candles }: { candles: StockCandle[] }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const width = 1000;
@@ -246,7 +270,9 @@ function App() {
   const [chartStock, setChartStock] = useState<WatchlistStock | null>(null);
   const [chartRange, setChartRange] = useState<StockChartRange>("OneMonth");
   const [chartCandles, setChartCandles] = useState<StockCandle[]>([]);
+  const [chartYearCandles, setChartYearCandles] = useState<StockCandle[]>([]);
   const [isChartLoading, setIsChartLoading] = useState(false);
+  const [isChartYearLoading, setIsChartYearLoading] = useState(false);
   const [tradePlans, setTradePlans] = useState<TradePlan[]>([]);
   const [tradePlanForm, setTradePlanForm] = useState<TradePlan>(emptyTradePlan);
   const [tradePlanStockSearch, setTradePlanStockSearch] = useState("");
@@ -254,6 +280,9 @@ function App() {
   const [isTradePlanStockSearching, setIsTradePlanStockSearching] = useState(false);
   const [tradePlanDetails, setTradePlanDetails] = useState<TradePlan | null>(null);
   const [totalProfitLoss, setTotalProfitLoss] = useState(0);
+
+  const chartSummary = useMemo(() => getChartSummary(chartCandles), [chartCandles]);
+  const chartYearHighLow = useMemo(() => getCandleHighLow(chartYearCandles), [chartYearCandles]);
   const [activeView, setActiveView] = useState<View>("holdings");
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -588,11 +617,30 @@ function App() {
     }
   }
 
+  async function loadChartYearHighLow(stock: WatchlistStock) {
+    if (!stock.symbolToken) {
+      return;
+    }
+
+    setIsChartYearLoading(true);
+
+    try {
+      const result = await getStockChart(stock.symbolToken, stock.exchange as StockExchange, "OneYear");
+      setChartYearCandles(result.candles);
+    } catch {
+      setChartYearCandles([]);
+    } finally {
+      setIsChartYearLoading(false);
+    }
+  }
+
   function openStockChart(stock: WatchlistStock) {
     setChartStock(stock);
     setChartRange("OneMonth");
     setChartCandles([]);
+    setChartYearCandles([]);
     void loadStockChart(stock, "OneMonth");
+    void loadChartYearHighLow(stock);
   }
 
   function openHoldingChart(holding: HoldingStock) {
@@ -616,6 +664,7 @@ function App() {
   function closeStockChart() {
     setChartStock(null);
     setChartCandles([]);
+    setChartYearCandles([]);
   }
 
   function openStockDetails(stock: WatchlistStock) {
@@ -1145,6 +1194,9 @@ function App() {
                   <div className="row-actions">
                     <button type="button" className="secondary" onClick={() => openStockDetails(stock)}>
                       Details
+                    </button>
+                    <button type="button" onClick={() => openStockChart(stock)} disabled={isBusy || !stock.symbolToken}>
+                      Chart
                     </button>
                     <button type="button" className="secondary" onClick={() => void handleDeleteStock(stock)} disabled={isBusy}>
                       Remove
@@ -1830,7 +1882,37 @@ function App() {
             <div className="chart-surface">
               {isChartLoading && <p className="helper-text">Loading chart...</p>}
               {!isChartLoading && chartCandles.length === 0 && <p className="helper-text">No chart data available.</p>}
-              {!isChartLoading && chartCandles.length > 0 && <StockLineChart candles={chartCandles} />}
+              {!isChartLoading && chartCandles.length > 0 && (
+                <>
+                  <StockLineChart candles={chartCandles} />
+                  <div className="chart-stat-grid">
+                    <div>
+                      <span>Open</span>
+                      <strong>{formatOptionalMoney(chartSummary?.open)}</strong>
+                    </div>
+                    <div>
+                      <span>High</span>
+                      <strong>{formatOptionalMoney(chartSummary?.high)}</strong>
+                    </div>
+                    <div>
+                      <span>Low</span>
+                      <strong>{formatOptionalMoney(chartSummary?.low)}</strong>
+                    </div>
+                    <div>
+                      <span>Close</span>
+                      <strong>{formatOptionalMoney(chartSummary?.close)}</strong>
+                    </div>
+                    <div>
+                      <span>52W High</span>
+                      <strong>{isChartYearLoading ? "Loading..." : formatOptionalMoney(chartYearHighLow?.high)}</strong>
+                    </div>
+                    <div>
+                      <span>52W Low</span>
+                      <strong>{isChartYearLoading ? "Loading..." : formatOptionalMoney(chartYearHighLow?.low)}</strong>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </section>
         </div>

@@ -28,20 +28,6 @@ public sealed class StockProfileRepository(IDbConnectionFactory connectionFactor
             left join stock_profiles
               on stock_profiles.stock_id = stocks.id
             where (
-                exists (
-                    select 1
-                    from watchlist
-                    where watchlist.stock_id = stocks.id
-                      and watchlist.is_active = true
-                )
-                or exists (
-                    select 1
-                    from trade_plans
-                    where trade_plans.stock_id = stocks.id
-                      and trade_plans.is_active = true
-                )
-            )
-              and (
                   stock_profiles.id is null
                   or (
                       nullif(trim(stock_profiles.sector), '') is null
